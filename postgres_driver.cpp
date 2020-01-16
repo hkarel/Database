@@ -42,6 +42,7 @@
 #include <QVarLengthArray>
 #include <utility>
 #include <stdlib.h>
+#include "/usr/include/byteswap.h"
 
 #define log_error_m   alog::logger().error  (__FILE__, __func__, __LINE__, "PostgresDrv")
 #define log_warn_m    alog::logger().warn   (__FILE__, __func__, __LINE__, "PostgresDrv")
@@ -252,7 +253,7 @@ qint64 toTimeStamp(const QDateTime& dt)
 //    ts.timestamp_time = midnight.msecsTo(dt.time()) * 1000;
 //    ts.timestamp_date = basedate.daysTo(dt.date());
 
-    break_point
+    //break_point
     // отладить
 
     return dt.toMSecsSinceEpoch() * 1000;
@@ -266,8 +267,8 @@ QDateTime fromTimeStamp(qint64 ts)
 
 qint64 toTime(const QTime& t)
 {
-    static const QTime midnight {0, 0, 0, 0};
-    return midnight.msecsTo(t) * 1000;
+    qint64 fromMidnight = (qint64)t.msecsSinceStartOfDay() * 1000;
+    return fromMidnight;
 }
 
 QTime fromTime(qint64 pgtime)
@@ -1154,14 +1155,18 @@ bool Result::prepare(const QString& query)
     }
     _stmt = pgres;
 
+    // nfields - число столбцов (полей) в каждой строке полученной выборки.
+    // При выполнении INSERT или UPDATE запроса, столбцы не выбираются, поэтому
+    // предполагаем количество таких столбцов будет равно 0. В этом случае запрос
+    // будет установлен как "Not Select".
     int nfields = PQnfields(_stmt);
     setSelect(nfields != 0);
 
-    if (nfields == 0)
-    {
-        break_point
-        // отладить
-    }
+//    if (nfields == 0)
+//    {
+//        break_point
+//        // отладить
+//    }
 
 /*
     ISC_STATUS status[20] = {0};
@@ -1775,11 +1780,14 @@ bool Result::exec()
         return false;
     }
 
-    if (1 != PQsetSingleRowMode(_drv->_connect))
+    if (isSelectSql())
     {
-        SET_LAST_ERROR("Failed turn on single-row mode", QSqlError::UnknownError)
-        rollbackInternalTransact();
-        return false;
+        if (1 != PQsetSingleRowMode(_drv->_connect))
+        {
+            SET_LAST_ERROR("Failed turn on single-row mode", QSqlError::UnknownError)
+            rollbackInternalTransact();
+            return false;
+        }
     }
 
     // После удачного вызова PQsendQueryPrepared() вызовы PQgetResult() буду
@@ -1927,7 +1935,7 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
 
             case PG_TYPE_BYTEARRAY:
             {
-                break_point
+                // break_point
                 // отладить
 
                 int fsize = PQfsize(_stmt, i);
