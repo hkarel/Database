@@ -42,7 +42,7 @@
 #include <QVarLengthArray>
 #include <utility>
 #include <stdlib.h>
-#include "/usr/include/byteswap.h"
+#include <byteswap.h>
 
 #define log_error_m   alog::logger().error  (__FILE__, __func__, __LINE__, "PostgresDrv")
 #define log_warn_m    alog::logger().warn   (__FILE__, __func__, __LINE__, "PostgresDrv")
