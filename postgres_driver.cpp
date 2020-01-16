@@ -267,8 +267,13 @@ QDateTime fromTimeStamp(qint64 ts)
 
 qint64 toTime(const QTime& t)
 {
-    qint64 fromMidnight = (qint64)t.msecsSinceStartOfDay() * 1000;
-    return fromMidnight;
+    //break_point
+    // Метода msecsSinceStartOfDay() нет в Qt4
+    //qint64 fromMidnight = (qint64)t.msecsSinceStartOfDay() * 1000;
+
+    // Проверить такой вариант
+    static const QTime midnight {0, 0, 0, 0};
+    return qint64(midnight.msecsTo(t)) * 1000;
 }
 
 QTime fromTime(qint64 pgtime)
