@@ -1772,17 +1772,37 @@ bool Result::exec()
     if (_sqlda)
         init(_sqlda->sqld);
 */
-
-    if (1 != PQsendQueryPrepared(_drv->_connect, _stmtName,
-                                 nparams,             // int nParams,
-                                 params.paramValues,  // const char * const *paramValues,
-                                 params.paramLengths, // const int *paramLengths,
-                                 params.paramFormats, // const int *paramFormats,
-                                 1 ))                 // int resultFormat
+    if (isSelectSql())
     {
-        SET_LAST_ERROR("Failed call PQsendQueryPrepared()", QSqlError::UnknownError)
-        rollbackInternalTransact();
-        return false;
+        if (1 != PQsendQueryPrepared(_drv->_connect, _stmtName,
+                                     nparams,             // int nParams,
+                                     params.paramValues,  // const char * const *paramValues,
+                                     params.paramLengths, // const int *paramLengths,
+                                     params.paramFormats, // const int *paramFormats,
+                                     1 ))                 // int resultFormat
+        {
+            log_debug2_m <<  PQerrorMessage(_drv->_connect);
+            SET_LAST_ERROR("Failed call PQsendQueryPrepared()", QSqlError::UnknownError)
+            rollbackInternalTransact();
+            return false;
+        }
+    }
+    else
+    {
+        PGresultPtr pgres;
+
+        pgres = PGR(PQexecPrepared(_drv->_connect, _stmtName,
+                                   nparams,             // int nParams,
+                                   params.paramValues,  // const char * const *paramValues,
+                                   params.paramLengths, // const int *paramLengths,
+                                   params.paramFormats, // const int *paramFormats,
+                                   1 ));
+
+        if (CHECK_ERROR("Could not prepare statement", QSqlError::StatementError))
+        {
+            rollbackInternalTransact();
+            return false;
+        }
     }
 
     if (isSelectSql())
@@ -2535,6 +2555,8 @@ bool Driver::open(const QString& db,
 
     _threadId = trd::gettid();
 
+    //int a = PQbeginBatchMode(_connect);
+
     setOpen(true);
     setOpenError(false);
     log_verbose_m << "Database is open. Connect: " << addrToNumber(_connect);
@@ -2798,6 +2820,38 @@ bool Driver::operationIsAborted() const
     return _operationIsAborted;
 }
 
+void Driver::copyInsert(const QString& table, const QList<QString>& columns, const QString& buffer)
+{
+    const char *errmsg = nullptr;
+
+    PGresultPtr pgres;
+
+    QString sql = " COPY %1(%2)              "
+                  " FROM STDIN DELIMITER ';' "
+                  " CSV ENCODING 'UTF8'      "
+                  " QUOTE '\"'               "
+                  " ESCAPE '''';             ";
+
+    sql = sql.arg(table);
+    sql = sql.arg(columns.join(","));
+
+    pgres = pqexec(_connect, sql.toStdString().c_str());
+
+    if (!pgres)
+        PQresultErrorMessage(pgres);
+
+    int bufSize = strlen(buffer.toStdString().c_str());
+
+    if (1 != PQputCopyData(_connect, buffer.toStdString().c_str(), bufSize))
+        log_error_m << "Ошибка PQputCopyData: " << PQerrorMessage(_connect);
+
+    if (1 != PQputCopyEnd(_connect, errmsg))
+        log_error_m << "Ошибка PQputCopyEnd: " << PQerrorMessage(_connect);
+
+    if (errmsg )
+        log_error_m << "Ошибка вставки данных:" << errmsg
+                    << "Детали: " << PQerrorMessage(_connect);
+}
 //-------------------------------- Functions ---------------------------------
 
 Transaction::Ptr createTransact(const DriverPtr& drv)
