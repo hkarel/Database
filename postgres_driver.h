@@ -143,6 +143,15 @@ public:
     bool exec() override;
     //QVariant handle() const override;
 
+    /**
+     * Функция получает на входе буфер в виде строки, в которой содержатся
+     * данные в формате csv, и выполняет экспорт данных в таблицу.
+     * @table - имя таблицы
+     * @colums - список столбцов csv и таблицы
+     * @buffer - буфер данных
+    */
+    bool copyInsert(const QString& table, const QList<QString>& columns, const QString& buffer);
+
 protected:
     bool gotoNext(SqlCachedResult::ValueCache& row, int rowIdx) /*override*/;
     bool reset(const QString& query) override;
@@ -256,15 +265,6 @@ public:
 //    bool subscribeToNotificationImplementation(const QString &name);
 //    bool unsubscribeFromNotificationImplementation(const QString &name);
 //    QStringList subscribedToNotificationsImplementation() const;
-
-    /**
-     * Функция получает на входе буфер в виде строки, в которой содержатся
-     * данные в формате csv, и выполняет экспорт данных в таблицу.
-     * @table - имя таблицы
-     * @colums - список столбцов csv и таблицы
-     * @buffer - буфер данных
-    */
-    void copyInsert(const QString& table, const QList<QString>& columns, const QString& buffer);
 
 private:
     void setOpen(bool) override;

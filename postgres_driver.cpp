@@ -1845,6 +1845,70 @@ bool Result::exec()
     return true;
 }
 
+bool Result::copyInsert(const QString& table, const QList<QString>& columns, const QString& buffer)
+{
+    const char *errmsg = nullptr;
+
+    PGresultPtr pgres;
+
+    pid_t threadId = trd::gettid();
+    if (_drv->threadId() != threadId)
+    {
+        log_error_m << "Failed prepare query, threads identifiers not match"
+                    << ". Connection thread id: " << _drv->threadId()
+                    << ", current thread id: " << threadId;
+        return false;
+    }
+    if (_drv->operationIsAborted())
+    {
+        SET_LAST_ERROR("Sql-operation aborted", QSqlError::UnknownError)
+        return false;
+    }
+    if (!_drv->isOpen() || _drv->isOpenError())
+    {
+        SET_LAST_ERROR("Database not open", QSqlError::ConnectionError)
+        return false;
+    }
+
+    cleanup();
+    setActive(false);
+    setAt(QSql::BeforeFirstRow);
+
+    if (!beginInternalTransact())
+        return false;
+
+    QString sql = " COPY %1(%2)              "
+                  " FROM STDIN DELIMITER ';' "
+                  " CSV ENCODING 'UTF8'      "
+                  " QUOTE '\"'               "
+                  " ESCAPE '''';             ";
+
+    sql = sql.arg(table);
+    sql = sql.arg(columns.join(","));
+
+    pgres = pqexec(_drv->_connect, sql.toStdString().c_str());
+
+    if (!pgres)
+        PQresultErrorMessage(pgres);
+
+    int bufSize = strlen(buffer.toStdString().c_str());
+
+    if (1 != PQputCopyData(_drv->_connect, buffer.toStdString().c_str(), bufSize))
+        log_error_m << "Ошибка PQputCopyData: " << PQerrorMessage(_drv->_connect);
+
+    if (1 != PQputCopyEnd(_drv->_connect, errmsg))
+        log_error_m << "Ошибка PQputCopyEnd: " << PQerrorMessage(_drv->_connect);
+
+    if (errmsg )
+        log_error_m << "Ошибка вставки данных:" << errmsg
+                    << "Детали: " << PQerrorMessage(_drv->_connect);
+
+    if (!commitInternalTransact())
+        return false;
+
+    return  true;
+}
+
 bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
 {
     if (_drv->operationIsAborted())
@@ -2815,38 +2879,6 @@ bool Driver::operationIsAborted() const
     return _operationIsAborted;
 }
 
-void Driver::copyInsert(const QString& table, const QList<QString>& columns, const QString& buffer)
-{
-    const char *errmsg = nullptr;
-
-    PGresultPtr pgres;
-
-    QString sql = " COPY %1(%2)              "
-                  " FROM STDIN DELIMITER ';' "
-                  " CSV ENCODING 'UTF8'      "
-                  " QUOTE '\"'               "
-                  " ESCAPE '''';             ";
-
-    sql = sql.arg(table);
-    sql = sql.arg(columns.join(","));
-
-    pgres = pqexec(_connect, sql.toStdString().c_str());
-
-    if (!pgres)
-        PQresultErrorMessage(pgres);
-
-    int bufSize = strlen(buffer.toStdString().c_str());
-
-    if (1 != PQputCopyData(_connect, buffer.toStdString().c_str(), bufSize))
-        log_error_m << "Ошибка PQputCopyData: " << PQerrorMessage(_connect);
-
-    if (1 != PQputCopyEnd(_connect, errmsg))
-        log_error_m << "Ошибка PQputCopyEnd: " << PQerrorMessage(_connect);
-
-    if (errmsg )
-        log_error_m << "Ошибка вставки данных:" << errmsg
-                    << "Детали: " << PQerrorMessage(_connect);
-}
 //-------------------------------- Functions ---------------------------------
 
 Transaction::Ptr createTransact(const DriverPtr& drv)
