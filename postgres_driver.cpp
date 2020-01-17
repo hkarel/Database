@@ -1884,7 +1884,24 @@ bool Result::copyInsert(const QString& table, const QList<QString>& columns, con
                   " ESCAPE '''';             ";
 
     sql = sql.arg(table);
-    sql = sql.arg(columns.join(","));
+
+    QString join;
+    if (columns.size() == 1)
+    {
+        join = columns.first();
+    }
+    else
+    {
+        join = columns.first();
+        QList<QString> cols = columns;
+        cols.removeAt(0);
+        for(const QString& item : cols )
+        {
+            join += "," + item;
+        }
+    }
+
+    sql = sql.arg(join);
 
     pgres = pqexec(_drv->_connect, sql.toStdString().c_str());
 
