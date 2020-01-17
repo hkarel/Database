@@ -150,7 +150,18 @@ QString insertIntoStatement(const QString& tableName, const QString& fields);
 QString updateOrInsertStatement(const QString& tableName, const QString& fields,
                                 const QString& matching);
 
+// Генерирует sql-запрос вида:
+// "UPDATE OR INSERT INTO %1 (%2) VALUES (%3) MATCHING (%4)"
+QString insertOnConflictNothing(const QString& tableName, const QString& fields,
+                                const QString& matching);
+
+// Генерирует sql-запрос вида:
+// "UPDATE OR INSERT INTO %1 (%2) VALUES (%3) MATCHING (%4)"
+QString insertOnConflictUpdate(const QString& tableName, const QList<QString>& fields,
+                                const QString& matching);
 } // namespace sql
 
-#define INSERT_INTO            insertIntoStatement
-#define UPDATE_OR_INSERT_INTO  updateOrInsertStatement
+#define INSERT_INTO                insertIntoStatement
+#define UPDATE_OR_INSERT_INTO      updateOrInsertStatement
+#define INSERT_ON_CONFLICT_NOTHING insertOnConflictNothing
+#define INSERT_ON_CONFLICT_UPDATE  insertOnConflictUpdate

@@ -1116,6 +1116,8 @@ bool Result::prepare(const QString& query)
             pgQuery += ch;
     }
 
+    //pgQuery = "INSERT INTO table3 (id, num1 , num2) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET num1 = $2 , num2 = $3";
+
     cleanup();
     setActive(false);
     setAt(QSql::BeforeFirstRow);

@@ -158,6 +158,57 @@ QString fieldsToPlaceholders(QString fields)
     return fields;
 }
 
+QString fieldsToPlaceholders(const QList<QString>& fields)
+{
+    static QRegExp reg {R"(\s+)"};
+    QList<QString> copy = fields;
+    QString line;
+
+    line = ":" + copy.first();
+    copy.removeFirst();
+
+    for(const QString& item : copy)
+    {
+        QString s = item;
+        s.remove(reg);
+        s = s.prepend(", :");
+        line += s;
+
+    }
+
+
+    return line;
+}
+
+QString fieldsListToString(const QList<QString>& fields)
+{
+    QList<QString> copy = fields;
+    QString list = copy.first();
+    copy.removeFirst();
+
+    for(const QString& item : copy)
+    {
+        list += ", " + item;
+    }
+    return list;
+}
+
+QString fieldsToPlaceholders(const QList<QString>& fields, const QString& matching)
+{
+    QList<QString> copy = fields;
+    copy.removeOne(matching);
+
+    QString list = copy.first() + "= :" + copy.first();
+    copy.removeFirst();
+
+    for(const QString& item : copy)
+    {
+        list += ", " + item + " = :" + item;
+    }
+    return list;
+}
+
+
 QString insertIntoStatement(const QString& tableName, const QString& fields)
 {
     QString sql = "INSERT INTO %1 (%2) VALUES (%3)";
@@ -172,6 +223,26 @@ QString updateOrInsertStatement(const QString& tableName, const QString& fields,
     QString sql = "UPDATE OR INSERT INTO %1 (%2) VALUES (%3) MATCHING (%4)";
     QString placeholders = fieldsToPlaceholders(fields);
     sql = sql.arg(tableName).arg(fields).arg(placeholders).arg(matching);
+    return sql;
+}
+
+QString insertOnConflictNothing(const QString& tableName, const QString& fields,
+                                const QString& matching)
+{
+    QString sql = "INSERT INTO %1 (%2) VALUES (%3) ON CONFLICT (%4) DO NOTHING";
+    QString placeholders = fieldsToPlaceholders(fields);
+    sql = sql.arg(tableName).arg(fields).arg(placeholders).arg(matching);
+    return sql;
+}
+
+QString insertOnConflictUpdate(const QString& tableName, const QList<QString>& fields,
+                                const QString& matching)
+{
+    QString sql = "INSERT INTO %1 (%2) VALUES (%3) ON CONFLICT (%4) DO UPDATE SET %5";
+    QString fieldsString = fieldsListToString(fields);
+    QString placeholders = fieldsToPlaceholders(fields);
+    QString placeholdersWoMatch = fieldsToPlaceholders(fields, matching);
+    sql = sql.arg(tableName).arg(fieldsString).arg(placeholders).arg(matching).arg(placeholdersWoMatch);
     return sql;
 }
 
