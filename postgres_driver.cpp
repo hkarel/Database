@@ -267,11 +267,6 @@ QDateTime fromTimeStamp(qint64 ts)
 
 qint64 toTime(const QTime& t)
 {
-    //break_point
-    // Метода msecsSinceStartOfDay() нет в Qt4
-    //qint64 fromMidnight = (qint64)t.msecsSinceStartOfDay() * 1000;
-
-    // Проверить такой вариант
     static const QTime midnight {0, 0, 0, 0};
     return qint64(midnight.msecsTo(t)) * 1000;
 }
@@ -2791,7 +2786,7 @@ void Driver::abortOperation()
                   << ". Connect: " << addrToNumber(_connect)
                   << " (call from thread: " << trd::gettid() << ")";
     // Отладить
-    break_point
+    //break_point
 
     _operationIsAborted = true;
 
