@@ -28,7 +28,8 @@ template<typename DatabaseT>
 class ConnectPool
 {
 public:
-    typedef std::function<bool (DatabaseT&)> InitFunc;
+
+    typedef std::function<bool (typename DatabaseT::Ptr)> InitFunc;
 
     ConnectPool() = default;
 
@@ -182,7 +183,7 @@ typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect()
 
     if (driver && !driver->isOpen())
     {
-        if (_initFunc.empty() || !_initFunc(driver))
+        if (_initFunc == nullptr || !_initFunc(driver))
             driver->abortOperation();
     }
     return driver;
