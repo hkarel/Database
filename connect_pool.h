@@ -134,13 +134,16 @@ typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect()
         if (d->threadId == threadId
             && d->driver->clife_count() > 1)
         {
+            break_point // Егоров В.Н.
+
             driver = d->driver;
             break;
         }
 
     if (driver.empty())
         for (typename Data::Ptr& d : _connectList)
-            if (d->driver->clife_count() == 1)
+            if (d->driver->clife_count() == 1
+                && d->threadId == threadId)
             {
                 driver = d->driver;
                 d->inUse = true;
