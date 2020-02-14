@@ -279,7 +279,7 @@ bool SqlCachedResult::cacheNext()
     if (d->atEnd)
         return false;
 
-    if(isForwardOnly()) {
+    if (isForwardOnly()) {
         d->cache.clear();
         d->cache.resize(d->colCount);
     }
