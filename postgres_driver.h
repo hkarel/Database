@@ -40,6 +40,9 @@
 #include <atomic>
 
 namespace db {
+
+template<typename> class ConnectPool;
+
 namespace postgres {
 
 class Result;
@@ -273,6 +276,8 @@ private:
     bool commitTransaction() override;
     bool rollbackTransaction() override;
 
+    void setThreadId(pid_t threadId) {_threadId = threadId;}
+
     // Вспомогательные функции, используются для предотвращения одновременного
     // использования более чем одной транзакции с текущим подключением к БД
     void captureTransactAddr(Transaction*);
@@ -297,6 +302,7 @@ private:
 
     friend class Result;
     friend class Transaction;
+    template<typename> friend class db::ConnectPool;
 };
 
 Transaction::Ptr createTransact(const DriverPtr&);

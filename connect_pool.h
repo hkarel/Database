@@ -28,18 +28,18 @@ template<typename DatabaseT>
 class ConnectPool
 {
 public:
-
     typedef std::function<bool (typename DatabaseT::Ptr)> InitFunc;
 
     ConnectPool() = default;
 
-    bool init(InitFunc);
+    // Таймаут задается в секундах
+    bool init(InitFunc, int timeout = 10*60 /*10 мин*/);
     void close();
 
     void abortOperations();
     void abortOperation(pid_t threadId);
 
-    typename DatabaseT::Ptr connect();
+    typename DatabaseT::Ptr connect(int timeout = 0);
 
 private:
     DISABLE_DEFAULT_COPY(ConnectPool)
@@ -51,6 +51,7 @@ private:
         typename DatabaseT::Ptr driver;
         bool inUse = {false};
         pid_t threadId = {0};
+        int timeout = {60}; /*60 сек*/
         simple_timer timer;
     };
 
@@ -58,17 +59,21 @@ private:
     InitFunc _initFunc;
     QMutex _poolLock;
 
+    // Таймаут по умолчанию (задается в секундах)
+    int _defaultTimeout;
+
     template<typename T, int> friend T& ::safe_singleton();
 };
 
 template<typename DatabaseT>
-bool ConnectPool<DatabaseT>::init(InitFunc initFunc)
+bool ConnectPool<DatabaseT>::init(InitFunc initFunc, int timeout)
 {
     _initFunc = initFunc;
-    return true;
+    _defaultTimeout = timeout;
+    //return true;
 
-    //typename DatabaseT::Ptr drv = connect();
-    //return drv->isOpen();
+    typename DatabaseT::Ptr drv = connect();
+    return drv->isOpen();
 }
 
 template<typename DatabaseT>
@@ -110,7 +115,7 @@ void ConnectPool<DatabaseT>::abortOperation(pid_t threadId)
 }
 
 template<typename DatabaseT>
-typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect()
+typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect(int timeout)
 {
     QMutexLocker locker(&_poolLock); (void) locker;
 
@@ -142,12 +147,19 @@ typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect()
 
     if (driver.empty())
         for (typename Data::Ptr& d : _connectList)
-            if (d->driver->clife_count() == 1
-                && d->threadId == threadId)
+            if (d->driver->clife_count() == 1)
+                // Это условие  приведет к тому,  что в новом потоке будет
+                // создаваться подключение, которое после окончания работы
+                // потока будет "висеть" еще timeout сек,  и его уже никто
+                // повторно не использует.
+                // && d->threadId == threadId)
             {
-                driver = d->driver;
                 d->inUse = true;
                 d->threadId = threadId;
+                d->timeout = (timeout > 0) ? timeout : _defaultTimeout;
+
+                driver = d->driver;
+                driver->setThreadId(threadId); // Сделано для Postgres
                 break;
             }
 
@@ -157,8 +169,11 @@ typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect()
         d->driver = DatabaseT::create();
         d->inUse = true;
         d->threadId = threadId;
+        d->timeout = (timeout > 0) ? timeout : _defaultTimeout;
         _connectList.append(d);
+
         driver = d->driver;
+        driver->setThreadId(threadId); // Сделано для Postgres
     }
 
     // Проверяем неиспользуемые коннекты
@@ -176,7 +191,8 @@ typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect()
         const typename Data::Ptr& d = _connectList[i];
         if (d->driver->clife_count() == 1
             && d->inUse == false
-            && d->timer.elapsed() > 20*60*1000 /*20 мин*/)
+            && d->timer.elapsed() > (d->timeout * 1000))
+            //&& d->timer.elapsed() > 20*60*1000 /*20 мин*/)
             //&& d->timer.elapsed() > 15*1000)
         {
             d->driver->close();
@@ -191,9 +207,6 @@ typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect()
     }
     return driver;
 }
-
-
-//ConnectPool& dbpool();
 
 } // namespace db
 
