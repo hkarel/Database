@@ -5,7 +5,7 @@
 #include "shared/container_ptr.h"
 #include "shared/logger/logger.h"
 #include "shared/simple_timer.h"
-#include "shared/thread/thread_info.h"
+#include "shared/thread/thread_utils.h"
 #include "shared/qt/logger/logger_operators.h"
 
 #include <QMutex>

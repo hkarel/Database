@@ -31,7 +31,7 @@
 #include "shared/logger/logger.h"
 #include "shared/qt/quuidex.h"
 #include "shared/qt/logger/logger_operators.h"
-#include "shared/thread/thread_info.h"
+#include "shared/thread/thread_utils.h"
 
 #include <QDateTime>
 #include <QRegExp>
