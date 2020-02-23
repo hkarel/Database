@@ -1377,6 +1377,9 @@ bool Result::exec()
                     continue;
             }
 
+            #pragma GCC diagnostic push
+            #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+
             int paramtype = PQparamtype(_stmt, i);
             switch (paramtype)
             {
@@ -1531,6 +1534,7 @@ bool Result::exec()
                     return false;
                 }
             }
+            #pragma GCC diagnostic pop
         }
     }
 
@@ -1985,6 +1989,9 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
             continue;
         }
 
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+
         const char* value = PQgetvalue(pgres, 0, i);
         switch (ftype)
         {
@@ -2059,6 +2066,7 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
             default:
                 row[idx] = QVariant();
         }
+        #pragma GCC diagnostic pop
     }
 
 /*
