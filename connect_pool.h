@@ -139,8 +139,6 @@ typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect(int timeout)
         if (d->threadId == threadId
             && d->driver->clife_count() > 1)
         {
-            break_point // Егоров В.Н.
-
             driver = d->driver;
             break;
         }
