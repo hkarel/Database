@@ -43,7 +43,7 @@
 #include "shared/break_point.h"
 #include "shared/safe_singleton.h"
 #include "shared/logger/logger.h"
-#include "shared/thread/thread_info.h"
+#include "shared/thread/thread_utils.h"
 #include "shared/qt/logger/logger_operators.h"
 
 #include <QDateTime>
@@ -1440,6 +1440,7 @@ bool Result::writeBlob(XSQLVAR& sqlVar, const QByteArray& ba)
         //CHECK_ERROR("Unable to close BLOB", QSqlError::StatementError);
         return false;
     }
+
     int j = 0;
     while (j < ba.size())
     {

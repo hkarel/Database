@@ -54,6 +54,9 @@
 #include <atomic>
 
 namespace db {
+
+template<typename> class ConnectPool;
+
 namespace firebird {
 
 class Result;
@@ -218,6 +221,9 @@ private:
     bool commitTransaction() override;
     bool rollbackTransaction() override;
 
+    // Фиктивная функция, необходима для совместимости с Postgres-драйвером
+    void setThreadId(pid_t) {}
+
     isc_db_handle* ibase() const {return (isc_db_handle*)&_ibase;}
     bool checkError(const char* msg, QSqlError::ErrorType type,
                     ISC_STATUS* status, const char* func, int line);
@@ -251,6 +257,7 @@ private:
 
     friend class Result;
     friend class Transaction;
+    template<typename> friend class db::ConnectPool;
 };
 
 Transaction::Ptr createTransact(const DriverPtr&);
