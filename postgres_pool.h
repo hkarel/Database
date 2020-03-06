@@ -6,7 +6,7 @@
 namespace db {
 namespace postgres {
 
-typedef ConnectPool<Driver>  Pool;
+typedef ConnectPool<Driver> Pool;
 
 Pool& pool();
 
