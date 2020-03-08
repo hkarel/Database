@@ -1270,11 +1270,8 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
 
             case PG_TYPE_BYTEARRAY:
             {
-                // break_point
-                // отладить
-
-                int fsize = PQfsize(_stmt, i);
-                row[idx] = QByteArray(value, fsize);
+                int len = PQgetlength(pgres, 0, i);
+                row[idx] = QByteArray(value, len);
                 break;
             }
             case PG_TYPE_STRING:
@@ -1283,11 +1280,25 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
 
             case PG_TYPE_UUID:
             {
+                /**
+                  PQfsize - возвращает размер поля определенный в БД
+                  PQgetlength - возвращает текущий размер данных в датасете
+                  int fsize = PQfsize(_stmt, i);
+                  int len = PQgetlength(pgres, 0, i);
+                */
                 int fsize = PQfsize(_stmt, i);
-                const QUuid& uuid =
-                    QUuidEx::fromRfc4122(QByteArray::fromRawData(value, fsize));
-                const QUuidEx& uuidex = static_cast<const QUuidEx&>(uuid);
-                row[idx].setValue(uuidex);
+                if (fsize == 16)
+                {
+                    const QUuid& uuid =
+                        QUuid::fromRfc4122(QByteArray::fromRawData(value, fsize));
+                    const QUuidEx& uuidex = static_cast<const QUuidEx&>(uuid);
+                    row[idx].setValue(uuidex);
+                }
+                else
+                {
+                    log_error_m << "Raw uuid field must be 16 bytes";
+                    row[idx].setValue(QUuidEx());
+                }
                 break;
             }
             default:
