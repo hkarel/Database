@@ -1124,7 +1124,7 @@ bool Result::copyInsert(const QString& table, const QList<QString>& columns, con
         join = columns.first();
         QList<QString> cols = columns;
         cols.removeAt(0);
-        for(const QString& item : cols )
+        for (const QString& item : cols)
         {
             join += "," + item;
         }
@@ -1140,14 +1140,16 @@ bool Result::copyInsert(const QString& table, const QList<QString>& columns, con
     int bufSize = strlen(buffer.toStdString().c_str());
 
     if (1 != PQputCopyData(_drv->_connect, buffer.toStdString().c_str(), bufSize))
-        log_error_m << "Ошибка PQputCopyData: " << PQerrorMessage(_drv->_connect);
+        log_error_m << "Failed call PQputCopyData()"
+                    << ". Detail: " << PQerrorMessage(_drv->_connect);
 
     if (1 != PQputCopyEnd(_drv->_connect, errmsg))
-        log_error_m << "Ошибка PQputCopyEnd: " << PQerrorMessage(_drv->_connect);
+        log_error_m << "Failed call PQputCopyEnd()"
+                    << ". Detail: " << PQerrorMessage(_drv->_connect);
 
-    if (errmsg )
-        log_error_m << "Ошибка вставки данных:" << errmsg
-                    << "Детали: " << PQerrorMessage(_drv->_connect);
+    if (errmsg)
+        log_error_m << "Failed insert data: " << errmsg
+                    << ". Detail: " << PQerrorMessage(_drv->_connect);
 
     if (!commitInternalTransact())
         return false;
