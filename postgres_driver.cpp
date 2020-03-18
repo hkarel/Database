@@ -144,18 +144,8 @@ QVariant::Type qPostgresTypeName(int pgType)
 
 qint64 toTimeStamp(const QDateTime& dt)
 {
-//    static const QTime midnight {0, 0, 0, 0};
-//    //static const QDate basedate {1858, 11, 17};
-//    static const QDate basedate {2000, 01, 01};
-
-//    ISC_TIMESTAMP ts;
-//    ts.timestamp_time = midnight.msecsTo(dt.time()) * 1000;
-//    ts.timestamp_date = basedate.daysTo(dt.date());
-
-    //break_point
-    // отладить
-
-    return dt.toMSecsSinceEpoch() * 1000;
+    static const qint64 baseMSecs {QDateTime{QDate{2000, 01, 01}}.toMSecsSinceEpoch()};
+    return (dt.toMSecsSinceEpoch() - baseMSecs) * 1000;
 }
 
 QDateTime fromTimeStamp(qint64 ts)
