@@ -142,15 +142,17 @@ QVariant::Type qPostgresTypeName(int pgType)
     }
 }
 
+inline QDate baseDate() {return {2000, 01, 01};}
+
 qint64 toTimeStamp(const QDateTime& dt)
 {
-    static const qint64 baseMSecs {QDateTime{QDate{2000, 01, 01}}.toMSecsSinceEpoch()};
+    static const qint64 baseMSecs {QDateTime{baseDate()}.toMSecsSinceEpoch()};
     return (dt.toMSecsSinceEpoch() - baseMSecs) * 1000;
 }
 
 QDateTime fromTimeStamp(qint64 ts)
 {
-    static const QDateTime basedate {QDate{2000, 01, 01}};
+    static const QDateTime basedate {baseDate()};
     return basedate.addMSecs(ts / 1000);
 }
 
@@ -163,23 +165,19 @@ qint64 toTime(const QTime& t)
 QTime fromTime(qint64 pgtime)
 {
     static const QTime midnight {0, 0, 0, 0};
-    QTime t = midnight.addMSecs(int(pgtime / 1000));
-    return t;
+    return midnight.addMSecs(int(pgtime / 1000));
 }
 
 qint32 toDate(const QDate& d)
 {
-    //static const QDate basedate {1858, 11, 17};
-    static const QDate basedate {2000, 01, 01};
+    static const QDate basedate {baseDate()};
     return basedate.daysTo(d);
 }
 
 QDate fromDate(qint32 pgdate)
 {
-    //static const QDate basedate {1858, 11, 17};
-    static const QDate basedate {2000, 01, 01};
-    QDate d = basedate.addDays(pgdate);
-    return d;
+    static const QDate basedate {baseDate()};
+    return basedate.addDays(pgdate);
 }
 
 } // namespace
