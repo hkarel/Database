@@ -68,6 +68,8 @@ class Transaction : public clife_base
 public:
     typedef clife_ptr<Transaction> Ptr;
 
+    ~Transaction();
+
     bool begin();
     bool commit();
     bool rollback();

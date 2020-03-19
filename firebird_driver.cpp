@@ -684,8 +684,16 @@ char* createArrayBuffer(char* buffer, const QList<QVariant>& list,
 
 //------------------------------- Transaction --------------------------------
 
+Transaction::~Transaction()
+{
+    log_debug2_m << "Transaction dtor";
+    if (isActive())
+        rollback();
+}
+
 Transaction::Transaction(const DriverPtr& drv) : _drv(drv)
 {
+    log_debug2_m << "Transaction ctor";
     Q_ASSERT(_drv.get());
 }
 
@@ -799,7 +807,7 @@ AutoRollbackTransact::AutoRollbackTransact(const Transaction::Ptr& t)
 
 AutoRollbackTransact::~AutoRollbackTransact()
 {
-    log_debug2_m << "AutoRollbackTransact destructor";
+    log_debug2_m << "AutoRollbackTransact dtor";
     if (transact->isActive())
         transact->rollback();
 }
