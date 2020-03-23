@@ -46,6 +46,8 @@ QVariant bindVariant(qint64);
 QVariant bindVariant(quint64);
 QVariant bindVariant(const char*);
 
+inline QVariant bindVariant(const QVariant& val) {return val;}
+
 template<typename T>
 QVariant bindVariant(const T& val, typename sql::not_enum_type<T>::type = 0)
 {
