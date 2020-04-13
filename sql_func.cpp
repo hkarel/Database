@@ -70,6 +70,15 @@ QVariant bindVariant(const char* val)
     return QVariant(QString::fromLatin1(val));
 }
 
+QVariant bindVariant(const QVector<qint32>& val)
+{
+    int typeId = qMetaTypeId<QVector<qint32>>();
+    if (QMetaType::Type(typeId) >= QMetaType::User)
+        return QVariant::fromValue(val);
+
+    return QVariant();
+}
+
 void assignValue(bool& val, const QSqlRecord& rec, const QString& fieldName)
 {
     const QSqlField& f = rec.field(fieldName.trimmed());

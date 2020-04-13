@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "qmetatypes.h"
 #include "sqlcachedresult.h"
 #include "shared/defmac.h"
 #include "shared/clife_base.h"

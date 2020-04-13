@@ -51,23 +51,24 @@
 #define log_debug_m   alog::logger().debug  (__FILE__, __func__, __LINE__, "PostgresDrv")
 #define log_debug2_m  alog::logger().debug2 (__FILE__, __func__, __LINE__, "PostgresDrv")
 
-#define PG_TYPE_BOOL       16   // QBOOLOID
-#define PG_TYPE_INT8       18   // OINT1OID
-#define PG_TYPE_INT16      21   // QINT2OID
-#define PG_TYPE_INT32      23   // QINT4OID
-#define PG_TYPE_INT64      20   // QINT8OID
+#define PG_TYPE_BOOL        16   // QBOOLOID
+#define PG_TYPE_INT8        18   // OINT1OID
+#define PG_TYPE_INT16       21   // QINT2OID
+#define PG_TYPE_INT32       23   // QINT4OID
+#define PG_TYPE_INT64       20   // QINT8OID
 
-#define PG_TYPE_BYTEARRAY  17   // QBYTEARRAY (BINARY)
-#define PG_TYPE_STRING     25   // STRING (NOT BIN)
+#define PG_TYPE_BYTEARRAY   17   // QBYTEARRAY (BINARY)
+#define PG_TYPE_STRING      25   // STRING (NOT BIN)
 
-#define PG_TYPE_FLOAT      700  // QFLOAT4OID
-#define PG_TYPE_DOUBLE     701  // QFLOAT8OID
+#define PG_TYPE_FLOAT       700  // QFLOAT4OID
+#define PG_TYPE_DOUBLE      701  // QFLOAT8OID
 
-#define PG_TYPE_DATE       1082 // QDATEOID
-#define PG_TYPE_TIME       1083 // QTIMEOID
-#define PG_TYPE_TIMESTAMP  1114 // QTIMESTAMPOID
+#define PG_TYPE_DATE        1082 // QDATEOID
+#define PG_TYPE_TIME        1083 // QTIMEOID
+#define PG_TYPE_TIMESTAMP   1114 // QTIMESTAMPOID
 
-#define PG_TYPE_UUID       2950
+#define PG_TYPE_UUID        2950
+#define PG_TYPE_INT4_ARRAY  1007
 
 namespace db {
 namespace postgres {
@@ -136,6 +137,9 @@ QVariant::Type qPostgresTypeName(int pgType)
 
         case PG_TYPE_UUID:
             return QVariant::Type(qMetaTypeId<QUuidEx>());
+
+        case PG_TYPE_INT4_ARRAY:
+            return QVariant::Type(qMetaTypeId<QVector<qint32>>());
 
         default:
             return QVariant::Invalid;
@@ -968,6 +972,39 @@ bool Result::exec()
                     memcpy(params.paramValues[i], v.constData(), sz);
                     break;
                 }
+                case PG_TYPE_INT4_ARRAY:
+                {
+                    QVector<qint32> arr;
+                    if (val.canConvert<QVector<qint32>>())
+                        arr = val.value<QVector<qint32>>();
+
+                    int sz = (arr.count() * 2 + 5) * int(sizeof(qint32)) ;
+
+                    params.paramValues[i] = (char*)malloc(sz);
+                    params.paramLengths[i] = sz;
+
+                    qint32* v = (qint32*)params.paramValues[i];
+
+                    qint32 ndim = 1; // Размерность массива
+                    qint32 ign = 0;  // ?
+                    qint32 elemtype = 23; // Тип PG для INT4
+                    qint32 size = arr.count(); // Длина массива
+                    qint32 index = 0; // Индекс первого элемента массива
+
+                    *v++ = bswap_32(ndim);
+                    *v++ = bswap_32(ign);
+                    *v++ = bswap_32(elemtype);
+                    *v++ = bswap_32(size);
+                    *v++ = bswap_32(index);
+
+                    for (const qint32 item : arr)
+                    {
+                        *v++ = bswap_32((qint32)sizeof(qint32));
+                        *v++ = bswap_32(item);
+                    }
+
+                    break;
+                }
                 default:
                 {
                     QString msg = "Param %1, is unknown datatype: %2. Transact: %2/%3";
@@ -1287,6 +1324,52 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
                     QUuid::fromRfc4122(QByteArray::fromRawData(value, 16));
                 const QUuidEx& uuidex = static_cast<const QUuidEx&>(uuid);
                 row[idx].setValue(uuidex);
+                break;
+            }
+            case PG_TYPE_INT4_ARRAY:
+            {
+                int len = PQgetlength(pgres, 0, i);
+                qint32  arrSize = (len - 5 * sizeof(qint32)) / (2 * sizeof(qint32));
+                qint32* pArray  = (qint32 *)value;
+
+                qint32 ndim     = bswap_32(*pArray++); (void)ndim; // Размерность массива
+                qint32 ign      = bswap_32(*pArray++); (void)ign; // offset for data, removed by libpq
+                qint32 elemtype = bswap_32(*pArray++); (void)elemtype; // Тип PG для INT4
+                qint32 size     = bswap_32(*pArray++);
+                qint32 index    = bswap_32(*pArray++); (void)index; // Индекс первого элемента массива
+
+                QVector<qint32> arr;
+
+                if (elemtype != 23)
+                {
+                    break_point
+
+                    log_error_m << "Type of item array incorrect";
+                    row[idx].setValue(arr);
+
+                    break;
+                }
+
+                if (arrSize != size)
+                {
+                    break_point
+
+                    log_error_m << "Size of array incorrect";
+                    row[idx].setValue(arr);
+
+                    break;
+                }
+
+                arr.resize(size);
+
+                for (int i = 0; i < size; i ++)
+                {
+                    ++pArray; // Пропустить размер значения
+                    arr[i] = bswap_32(*pArray++);
+                }
+
+                row[idx].setValue(arr);
+
                 break;
             }
             default:

@@ -25,8 +25,10 @@
 
 #pragma once
 
+#include "qmetatypes.h"
 #include "shared/prog_abort.h"
 #include "shared/logger/logger.h"
+
 #include <QtSql>
 #include <type_traits>
 
@@ -45,6 +47,7 @@ QVariant bindVariant(quint32);
 QVariant bindVariant(qint64);
 QVariant bindVariant(quint64);
 QVariant bindVariant(const char*);
+QVariant bindVariant(const QVector<qint32>&);
 
 inline QVariant bindVariant(const QVariant& val) {return val;}
 
@@ -65,6 +68,20 @@ QVariant bindVariant(const T& val, typename sql::is_enum_type<T>::type = 0)
                   "Base type of enum must be 'unsigned int'");
 
     return bindVariant(static_cast<quint32>(val));
+}
+
+template<typename T>
+QVariant bindVariant(const QVector<T>& val, typename sql::is_enum_type<T>::type = 0)
+{
+    static_assert(std::is_same<typename std::underlying_type<T>::type, quint32>::value,
+                  "Base type of enum must be 'unsigned int'");
+
+    QVector<qint32> arr;
+    arr.resize(val.count());
+    for (int i = 0; i < val.count(); ++i)
+        arr[i] = static_cast<qint32>(val[i]);
+
+    return bindVariant(arr);
 }
 
 template<typename T>
@@ -95,7 +112,11 @@ void assignValue(T& val, const QSqlRecord& rec, const QString& fieldName,
                  typename sql::not_enum_type<T>::type = 0)
 {
     const QSqlField& f = rec.field(fieldName.trimmed());
-    if (f.isNull() || !f.isValid())
+
+    if (f.isNull())
+        return;
+
+    if (!f.isValid())
         return;
 
     int typeId = f.value().userType();
@@ -126,6 +147,30 @@ void assignValue(T& val, const QSqlRecord& rec, const QString& fieldName,
         qint32 v = field.value().value<qint32>();
         quint32 v2 = *((quint32*) &v);
         val = static_cast<T>(v2);
+    }
+}
+
+template<typename T>
+void assignValue(QVector<T>& val, const QSqlRecord& rec, const QString& fieldName,
+                 typename sql::is_enum_type<T>::type = 0)
+{
+    static_assert(std::is_same<typename std::underlying_type<T>::type, quint32>::value,
+                  "Base type of enum must be 'unsigned int'");
+
+    const QSqlField& field = rec.field(fieldName.trimmed());
+    if (field.isNull() || !field.isValid())
+        return;
+
+    if (field.value().canConvert<QVector<qint32>>())
+    {
+        QVector<qint32> arr = field.value().value<QVector<qint32>>();
+        val.resize(arr.count());
+
+        for(int i = 0; i < arr.count(); ++i)
+        {
+            quint32 v = *((quint32*) &arr[i]);
+            val[i] = static_cast<T>(v);
+        }
     }
 }
 
