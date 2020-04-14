@@ -68,6 +68,7 @@
 #define PG_TYPE_TIMESTAMP   1114 // QTIMESTAMPOID
 
 #define PG_TYPE_UUID        2950
+#define PG_TYPE_UUID_ARRAY  2951
 #define PG_TYPE_INT4_ARRAY  1007
 
 namespace db {
@@ -140,6 +141,9 @@ QVariant::Type qPostgresTypeName(int pgType)
 
         case PG_TYPE_INT4_ARRAY:
             return QVariant::Type(qMetaTypeId<QVector<qint32>>());
+
+        case PG_TYPE_UUID_ARRAY:
+            return QVariant::Type(qMetaTypeId<QVector<QUuidEx>>());
 
         default:
             return QVariant::Invalid;
@@ -1005,6 +1009,42 @@ bool Result::exec()
 
                     break;
                 }
+                case PG_TYPE_UUID_ARRAY:
+                {
+                    QVector<QUuidEx> arr;
+                    if (val.canConvert<QVector<QUuidEx>>())
+                        arr = val.value<QVector<QUuidEx>>();
+
+                    int sz = (arr.count() * int(sizeof(QUuidEx)) + arr.count() * int(sizeof(quint32))) + 5 * sizeof(quint32) ;
+
+                    params.paramValues[i] = (char*)malloc(sz);
+                    params.paramLengths[i] = sz;
+
+                    qint32* v = (qint32*)params.paramValues[i];
+
+                    qint32 ndim = 1; // Размерность массива
+                    qint32 ign = 0;  // ?
+                    qint32 elemtype = 2950; // Тип PG для UUID
+                    qint32 size = arr.count(); // Длина массива
+                    qint32 index = 0; // Индекс первого элемента массива
+
+                    *v++ = bswap_32(ndim);
+                    *v++ = bswap_32(ign);
+                    *v++ = bswap_32(elemtype);
+                    *v++ = bswap_32(size);
+                    *v++ = bswap_32(index);
+
+
+                    for (const QUuidEx item : arr)
+                    {
+                        *v++ = bswap_32((qint32)sizeof(QUuidEx));
+
+                        QByteArray ba = item.toRfc4122();
+                        memcpy(v, ba.constData(), 16);
+                        v += 4;
+                    }
+                    break;
+                }
                 default:
                 {
                     QString msg = "Param %1, is unknown datatype: %2. Transact: %2/%3";
@@ -1366,6 +1406,60 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
                 {
                     ++pArray; // Пропустить размер значения
                     arr[i] = bswap_32(*pArray++);
+                }
+
+                row[idx].setValue(arr);
+
+                break;
+            }
+            case PG_TYPE_UUID_ARRAY:
+            {
+                int len = PQgetlength(pgres, 0, i);
+                qint32  arrSize = (len - 5 * sizeof(qint32)) / (4 + sizeof(QUuidEx));
+                qint32* pArray  = (qint32 *)value;
+
+                qint32 ndim     = bswap_32(*pArray++); (void)ndim; // Размерность массива
+                qint32 ign      = bswap_32(*pArray++); (void)ign; // offset for data, removed by libpq
+                qint32 elemtype = bswap_32(*pArray++); (void)elemtype; // Тип PG для INT4
+                qint32 size     = bswap_32(*pArray++);
+                qint32 index    = bswap_32(*pArray++); (void)index; // Индекс первого элемента массива
+
+
+                QVector<QUuidEx> arr;
+
+                if (elemtype != 2950)
+                {
+                    break_point
+
+                    log_error_m << "Type of item array incorrect";
+                    row[idx].setValue(arr);
+
+                    break;
+                }
+
+                if (arrSize != size)
+                {
+                    break_point
+
+                    log_error_m << "Size of array incorrect";
+                    row[idx].setValue(arr);
+
+                    break;
+                }
+
+                arr.resize(size);
+
+                for (int i = 0; i < size; i ++)
+                {
+                    ++pArray; // Пропустить размер значения
+
+                    const QUuid& uuid =
+                        QUuid::fromRfc4122(QByteArray::fromRawData((char *)pArray, 16));
+                    const QUuidEx& uuidex = static_cast<const QUuidEx&>(uuid);
+
+                    arr[i] = uuidex;
+
+                    pArray = pArray + 4;
                 }
 
                 row[idx].setValue(arr);
