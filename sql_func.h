@@ -41,27 +41,27 @@ struct not_enum_type : std::enable_if<!std::is_enum<T>::value, int> {};
 template<typename T>
 struct is_enum_type : std::enable_if<std::is_enum<T>::value, int> {};
 
-template<typename T>
-auto bindVariant(const T& val, int, int) -> decltype(QVariant(val))
-{
-    if (qMetaTypeId<T>() == qMetaTypeId<QUuidEx>()
-        || qMetaTypeId<T>() == qMetaTypeId<QUuid>())
-    {
-        return QVariant::fromValue(val);
-    }
+//template<typename T>
+//auto bindVariant(const T& val, int, int) -> decltype(QVariant(val))
+//{
+//    if (qMetaTypeId<T>() == qMetaTypeId<QUuidEx>()
+//        || qMetaTypeId<T>() == qMetaTypeId<QUuid>())
+//    {
+//        return QVariant::fromValue(val);
+//    }
+//
+//    return QVariant(val);
+//}
 
-    return QVariant(val);
-}
-
-template<typename T>
-auto bindVariant(const T& val, long, long) -> decltype(QVariant())
-{
-    int typeId = qMetaTypeId<T>();
-    if (QMetaType::Type(typeId) >= QMetaType::User)
-        return QVariant::fromValue(val);
-
-    return QVariant();
-}
+//template<typename T>
+//auto bindVariant(const T& val, long, long) -> decltype(QVariant())
+//{
+//    int typeId = qMetaTypeId<T>();
+//    if (QMetaType::Type(typeId) >= QMetaType::User)
+//        return QVariant::fromValue(val);
+//
+//    return QVariant();
+//}
 
 } // namespace detail
 
