@@ -26,6 +26,7 @@
 #pragma once
 
 #include "qmetatypes.h"
+#include "shared/qt/quuidex.h"
 #include "shared/prog_abort.h"
 #include "shared/logger/logger.h"
 
@@ -43,6 +44,12 @@ struct is_enum_type : std::enable_if<std::is_enum<T>::value, int> {};
 template<typename T>
 auto bindVariant(const T& val, int, int) -> decltype(QVariant(val))
 {
+    if (qMetaTypeId<T>() == qMetaTypeId<QUuidEx>()
+        || qMetaTypeId<T>() == qMetaTypeId<QUuid>())
+    {
+        return QVariant::fromValue(val);
+    }
+
     return QVariant(val);
 }
 
@@ -73,7 +80,8 @@ inline QVariant bindVariant(const QVariant& val) {return val;}
 template<typename T>
 QVariant bindVariant(const T& val, typename detail::not_enum_type<T>::type = 0)
 {
-    return detail::bindVariant(val, 0, 0);
+    //return detail::bindVariant(val, 0, 0);
+    return QVariant::fromValue(val);
 }
 
 template<typename T>
