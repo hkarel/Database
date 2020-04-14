@@ -33,11 +33,30 @@
 #include <type_traits>
 
 namespace sql {
+namespace detail {
 
 template<typename T>
 struct not_enum_type : std::enable_if<!std::is_enum<T>::value, int> {};
 template<typename T>
 struct is_enum_type : std::enable_if<std::is_enum<T>::value, int> {};
+
+template<typename T>
+auto bindVariant(const T& val, int, int) -> decltype(QVariant(val))
+{
+    return QVariant(val);
+}
+
+template<typename T>
+auto bindVariant(const T& val, long, long) -> decltype(QVariant())
+{
+    int typeId = qMetaTypeId<T>();
+    if (QMetaType::Type(typeId) >= QMetaType::User)
+        return QVariant::fromValue(val);
+
+    return QVariant();
+}
+
+} // namespace detail
 
 QVariant bindVariant(bool);
 QVariant bindVariant(qint16);
@@ -47,22 +66,18 @@ QVariant bindVariant(quint32);
 QVariant bindVariant(qint64);
 QVariant bindVariant(quint64);
 QVariant bindVariant(const char*);
-QVariant bindVariant(const QVector<qint32>&);
+//QVariant bindVariant(const QVector<qint32>&);
 
 inline QVariant bindVariant(const QVariant& val) {return val;}
 
 template<typename T>
-QVariant bindVariant(const T& val, typename sql::not_enum_type<T>::type = 0)
+QVariant bindVariant(const T& val, typename detail::not_enum_type<T>::type = 0)
 {
-    int typeId = qMetaTypeId<T>();
-    if (QMetaType::Type(typeId) >= QMetaType::User)
-        return QVariant::fromValue(val);
-
-    return QVariant(val);
+    return detail::bindVariant(val, 0, 0);
 }
 
 template<typename T>
-QVariant bindVariant(const T& val, typename sql::is_enum_type<T>::type = 0)
+QVariant bindVariant(const T& val, typename detail::is_enum_type<T>::type = 0)
 {
     static_assert(std::is_same<typename std::underlying_type<T>::type, quint32>::value,
                   "Base type of enum must be 'unsigned int'");
@@ -71,7 +86,7 @@ QVariant bindVariant(const T& val, typename sql::is_enum_type<T>::type = 0)
 }
 
 template<typename T>
-QVariant bindVariant(const QVector<T>& val, typename sql::is_enum_type<T>::type = 0)
+QVariant bindVariant(const QVector<T>& val, typename detail::is_enum_type<T>::type = 0)
 {
     static_assert(std::is_same<typename std::underlying_type<T>::type, quint32>::value,
                   "Base type of enum must be 'unsigned int'");
@@ -109,7 +124,7 @@ void assignValue(quint64&, const QSqlRecord&, const QString& fieldName);
 
 template<typename T>
 void assignValue(T& val, const QSqlRecord& rec, const QString& fieldName,
-                 typename sql::not_enum_type<T>::type = 0)
+                 typename detail::not_enum_type<T>::type = 0)
 {
     const QSqlField& f = rec.field(fieldName.trimmed());
 
@@ -133,7 +148,7 @@ void assignValue(T& val, const QSqlRecord& rec, const QString& fieldName,
 
 template<typename T>
 void assignValue(T& val, const QSqlRecord& rec, const QString& fieldName,
-                 typename sql::is_enum_type<T>::type = 0)
+                 typename detail::is_enum_type<T>::type = 0)
 {
     static_assert(std::is_same<typename std::underlying_type<T>::type, quint32>::value,
                   "Base type of enum must be 'unsigned int'");
@@ -152,7 +167,7 @@ void assignValue(T& val, const QSqlRecord& rec, const QString& fieldName,
 
 template<typename T>
 void assignValue(QVector<T>& val, const QSqlRecord& rec, const QString& fieldName,
-                 typename sql::is_enum_type<T>::type = 0)
+                 typename detail::is_enum_type<T>::type = 0)
 {
     static_assert(std::is_same<typename std::underlying_type<T>::type, quint32>::value,
                   "Base type of enum must be 'unsigned int'");
