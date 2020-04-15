@@ -1039,7 +1039,7 @@ bool Result::exec()
                     {
                         *v++ = bswap_32((qint32)sizeof(QUuidEx));
 
-                        QByteArray ba = item.toRfc4122();
+                        const QByteArray& ba = item.toRfc4122();
                         memcpy(v, ba.constData(), 16);
                         v += 4;
                     }
