@@ -31,7 +31,7 @@
 #include "shared/logger/logger.h"
 #include "shared/simple_timer.h"
 #include "shared/thread/thread_utils.h"
-#include "shared/qt/logger/logger_operators.h"
+#include "shared/qt/logger_operators.h"
 
 #include <QMutex>
 #include <string>

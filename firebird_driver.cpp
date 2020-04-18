@@ -44,7 +44,7 @@
 #include "shared/safe_singleton.h"
 #include "shared/logger/logger.h"
 #include "shared/thread/thread_utils.h"
-#include "shared/qt/logger/logger_operators.h"
+#include "shared/qt/logger_operators.h"
 
 #include <QDateTime>
 #include <QVariant>

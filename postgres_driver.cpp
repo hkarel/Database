@@ -29,8 +29,8 @@
 #include "shared/prog_abort.h"
 #include "shared/safe_singleton.h"
 #include "shared/logger/logger.h"
+#include "shared/qt/logger_operators.h"
 #include "shared/qt/quuidex.h"
-#include "shared/qt/logger/logger_operators.h"
 #include "shared/thread/thread_utils.h"
 
 #include <QDateTime>
