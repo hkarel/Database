@@ -193,4 +193,20 @@ QString updateOrInsertStatement(const QString& tableName, const QString& fields,
     return sql;
 }
 
+QString insertOrUpdateStatementPG(const QString& tableName, const QString& fields,
+                                  const QString& matching)
+{
+    QString sql = "INSERT INTO %1 (%2) VALUES (%3) ON CONFLICT (%4) DO UPDATE SET %5";
+    QString placeholders = fieldsToPlaceholders(fields);
+    QStringList list = fields.split(',');
+    for (QString& s : list)
+    {
+        s = s.trimmed();
+        s = s + "=:" + s;
+    }
+    QString updateFields = list.join(',');
+    sql = sql.arg(tableName).arg(fields).arg(placeholders).arg(matching).arg(updateFields);
+    return sql;
+}
+
 } // namespace sql

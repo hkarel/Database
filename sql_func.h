@@ -220,7 +220,13 @@ QString insertIntoStatement(const QString& tableName, const QString& fields);
 QString updateOrInsertStatement(const QString& tableName, const QString& fields,
                                 const QString& matching);
 
+// Генерирует sql-запрос вида:
+// "INSERT INTO %1 (%2) VALUES (%3) ON CONFLICT (%4) DO UPDATE SET..."
+QString insertOrUpdateStatementPG(const QString& tableName, const QString& fields,
+                                  const QString& matching);
+
 } // namespace sql
 
 #define INSERT_INTO            insertIntoStatement
 #define UPDATE_OR_INSERT_INTO  updateOrInsertStatement
+#define INSERT_OR_UPDATE_PG    insertOrUpdateStatementPG
