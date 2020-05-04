@@ -803,6 +803,10 @@ bool Result::exec()
         for (int i = 0; i < nparams; ++i)
         {
             const QVariant& val = values[i];
+
+            if (val.isNull())
+                continue;
+
             if (!val.isValid())
             {
                 QString msg = "Query param%1 is invalid. Transact: %2/%3";
@@ -812,11 +816,6 @@ bool Result::exec()
                 SET_LAST_ERROR(msg, QSqlError::StatementError)
                 rollbackInternalTransact();
                 return false;
-            }
-
-            if (val.isNull())
-            {
-                continue;
             }
             else if (val.userType() == qMetaTypeId<QUuidEx>())
             {
