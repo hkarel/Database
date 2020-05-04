@@ -988,11 +988,11 @@ bool Result::exec()
 
                     qint32* v = (qint32*)params.paramValues[i];
 
-                    qint32 ndim = 1; // Размерность массива
-                    qint32 ign = 0;  // ?
-                    qint32 elemtype = 23; // Тип PG для INT4
+                    qint32 ndim = 1;           // Размерность массива
+                    qint32 ign = 0;            // ?
+                    qint32 elemtype = 23;      // Тип PG для INT4
                     qint32 size = arr.count(); // Длина массива
-                    qint32 index = 0; // Индекс первого элемента массива
+                    qint32 index = 0;          // Индекс первого элемента массива
 
                     *v++ = bswap_32(ndim);
                     *v++ = bswap_32(ign);
@@ -1021,11 +1021,11 @@ bool Result::exec()
 
                     qint32* v = (qint32*)params.paramValues[i];
 
-                    qint32 ndim = 1; // Размерность массива
-                    qint32 ign = 0;  // ?
-                    qint32 elemtype = 2950; // Тип PG для UUID
+                    qint32 ndim = 1;           // Размерность массива
+                    qint32 ign = 0;            // ?
+                    qint32 elemtype = 2950;    // Тип PG для UUID
                     qint32 size = arr.count(); // Длина массива
-                    qint32 index = 0; // Индекс первого элемента массива
+                    qint32 index = 0;          // Индекс первого элемента массива
 
                     *v++ = bswap_32(ndim);
                     *v++ = bswap_32(ign);
