@@ -242,41 +242,26 @@ bool Transaction::begin(IsolationLevel isolationLevel, WritePolicy writePolicy)
 
     const char* beginCmd = "BEGIN";
 
-    //template<> inline constexpr zview
-    //begin_cmd<read_committed, write_policy::read_only>{
-    //    "BEGIN READ ONLY"};
     if (isolationLevel == IsolationLevel::ReadCommitted
         && writePolicy == WritePolicy::ReadOnly)
     {
         beginCmd = "BEGIN READ ONLY";
     }
-    //template<> inline constexpr zview
-    //begin_cmd<repeatable_read, write_policy::read_write>{
-    //    "BEGIN ISOLATION LEVEL REPEATABLE READ"};
     else if (isolationLevel == IsolationLevel::RepeatableRead
              && writePolicy == WritePolicy::ReadWrite)
     {
         beginCmd = "BEGIN ISOLATION LEVEL REPEATABLE READ";
     }
-    //template<> inline constexpr zview
-    //begin_cmd<repeatable_read, write_policy::read_only>{
-    //    "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY"};
     else if (isolationLevel == IsolationLevel::RepeatableRead
              && writePolicy == WritePolicy::ReadOnly)
     {
         beginCmd = "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY";
     }
-    //template<> inline constexpr zview
-    //begin_cmd<serializable, write_policy::read_write>{
-    //    "BEGIN ISOLATION LEVEL SERIALIZABLE"};
     else if (isolationLevel == IsolationLevel::Serializable
              && writePolicy == WritePolicy::ReadWrite)
     {
         beginCmd = "BEGIN ISOLATION LEVEL SERIALIZABLE";
     }
-    //template<> inline constexpr zview
-    //begin_cmd<serializable, write_policy::read_only>{
-    //    "BEGIN ISOLATION LEVEL SERIALIZABLE READ ONLY"};
     else if (isolationLevel == IsolationLevel::Serializable
              && writePolicy == WritePolicy::ReadOnly)
     {
@@ -830,8 +815,8 @@ bool Result::exec()
                     continue;
             }
 
-            #pragma GCC diagnostic push
-            #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
 
             int paramtype = PQparamtype(_stmt, i);
             switch (paramtype)
@@ -1056,9 +1041,11 @@ bool Result::exec()
                     return false;
                 }
             }
-            #pragma GCC diagnostic pop
+
+#pragma GCC diagnostic pop
+
         }
-    }
+    } // if (nparams != 0)
 
     if (isSelectSql())
     {
@@ -1280,8 +1267,8 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
             continue;
         }
 
-        #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
 
         const char* value = PQgetvalue(pgres, 0, i);
         switch (ftype)
@@ -1468,8 +1455,11 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
             default:
                 row[idx] = QVariant();
         }
-        #pragma GCC diagnostic pop
-    }
+
+#pragma GCC diagnostic pop
+
+    } // for (int i = 0; i < nfields; ++i)
+
     return true;
 }
 
@@ -1552,56 +1542,6 @@ int Result::numRowsAffected()
     // написать реализацию
 
     return -1;
-
-/*
-    char cCountType;
-    char acCountInfo[] = {isc_info_sql_records};
-
-    switch (_queryType)
-    {
-        case isc_info_sql_stmt_select:
-            cCountType = isc_info_req_select_count;
-            break;
-
-        case isc_info_sql_stmt_update:
-            cCountType = isc_info_req_update_count;
-            break;
-
-        case isc_info_sql_stmt_delete:
-            cCountType = isc_info_req_delete_count;
-            break;
-
-        case isc_info_sql_stmt_insert:
-            cCountType = isc_info_req_insert_count;
-            break;
-
-        default:
-            log_warn_m << "numRowsAffected(): Unknown statement type (" << _queryType << ")";
-            return -1;
-    }
-
-    char acBuffer[33];
-    int iResult = -1;
-    ISC_STATUS status[20] = {0};
-    isc_dsql_sql_info(status, &_stmt, sizeof(acCountInfo), acCountInfo, sizeof(acBuffer), acBuffer);
-    if (CHECK_ERROR("Could not get statement info", QSqlError::StatementError))
-        return -1;
-
-    for (char* pcBuf = acBuffer + 3; *pcBuf != isc_info_end; nothing)
-    {
-        char cType = *pcBuf++;
-        short sLength = isc_vax_integer(pcBuf, 2);
-        pcBuf += 2;
-        int iValue = isc_vax_integer(pcBuf, sLength);
-        pcBuf += sLength;
-        if (cType == cCountType)
-        {
-            iResult = iValue;
-            break;
-        }
-    }
-    return iResult;
-*/
 }
 
 QSqlRecord Result::record() const
@@ -1876,14 +1816,12 @@ void Driver::close()
 
 bool Driver::isOpen() const
 {
-    //return _isOpen;
     return (PQstatus(_connect) == CONNECTION_OK);
 }
 
 void Driver::setOpen(bool val)
 {
     QSqlDriver::setOpen(val);
-    //_isOpen = val;
 }
 
 Transaction::Ptr Driver::createTransact() const
@@ -1902,11 +1840,6 @@ QSqlResult* Driver::createResult(const Transaction::Ptr& transact) const
     return new Result(transact, Result::ForwardOnly::Yes);
     return 0;
 }
-
-//QVariant Driver::handle() const
-//{
-//    return QVariant(qRegisterMetaType<isc_db_handle>("isc_db_handle"), &_ibase);
-//}
 
 bool Driver::hasFeature(DriverFeature f) const
 {
@@ -1938,21 +1871,18 @@ bool Driver::hasFeature(DriverFeature f) const
 
 bool Driver::beginTransaction()
 {
-    //break_point
     log_debug2_m << "Call beginTransaction()";
     return false;
 }
 
 bool Driver::commitTransaction()
 {
-    //break_point
     log_debug2_m << "Call commitTransaction()";
     return false;
 }
 
 bool Driver::rollbackTransaction()
 {
-    //break_point
     log_debug2_m << "Call rollbackTransaction()";
     return false;
 }
@@ -2036,20 +1966,6 @@ QString Driver::formatValue(const QSqlField& field, bool trimStrings) const
 //{
 //}
 
-//bool Driver::checkError(const char* msg, QSqlError::ErrorType type,
-//                        const char* func, int line)
-//{
-////    ISC_LONG sqlcode; QString err;
-////    if (firebirdError(status, _textCodec, sqlcode, err))
-////    {
-////        setLastError(QSqlError("PostgresDriver", msg, type, 1));
-////        alog::logger().error(__FILE__, func, line, "PostgresDrv")
-////            << msg << "; Detail: " << err << "; SqlCode: " << sqlcode;
-////        return true;
-////    }
-//    return false;
-//}
-
 QString Driver::escapeIdentifier(const QString& identifier, IdentifierType) const
 {
     // Отладить
@@ -2072,8 +1988,6 @@ void Driver::abortOperation()
     log_verbose_m << "Abort sql-operation"
                   << ". Connect: " << addrToNumber(_connect)
                   << " (call from thread: " << trd::gettid() << ")";
-    // Отладить
-    //break_point
 
     _operationIsAborted = true;
 
@@ -2090,11 +2004,6 @@ void Driver::abortOperation()
         }
         PQfreeCancel(cancel);
     }
-
-//    ISC_STATUS status[20] = {0};
-//    //fb_cancel_operation(status, &_ibase, fb_cancel_raise);
-//    fb_cancel_operation(status, &_ibase, fb_cancel_abort);
-//    CHECK_ERROR("Failed abort sql-operation", QSqlError::UnknownError);
 }
 
 bool Driver::operationIsAborted() const

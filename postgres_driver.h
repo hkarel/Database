@@ -103,7 +103,6 @@ public:
     {
         // PostgreSQL only has the better isolation levels.
         // read_uncommitted,
-
         ReadCommitted,
         RepeatableRead,
         Serializable
@@ -121,13 +120,11 @@ private:
     Transaction(const DriverPtr&);
     DISABLE_DEFAULT_FUNC(Transaction)
     quint64 transactId() const {return _transactId;}
-    //isc_tr_handle* handle() const {return (isc_tr_handle*)&_trans;}
 
 private:
     DriverPtr _drv;
     bool      _isActive = {false};
     quint64   _transactId = quint64(-1);
-    //isc_tr_handle _trans = {0};
 
     friend class Result;
     friend class Driver;
@@ -145,7 +142,6 @@ public:
 
     bool prepare(const QString& query) override;
     bool exec() override;
-    //QVariant handle() const override;
 
     /**
       Функция получает на входе буфер в виде строки, в которой содержатся
@@ -157,7 +153,7 @@ public:
     bool copyInsert(const QString& table, const QList<QString>& columns, const QString& buffer);
 
 protected:
-    bool gotoNext(SqlCachedResult::ValueCache& row, int rowIdx) /*override*/;
+    bool gotoNext(SqlCachedResult::ValueCache& row, int rowIdx) override;
     bool reset(const QString& query) override;
     int  size() override;
     int  numRowsAffected() override;
@@ -185,12 +181,6 @@ private:
     bool rollbackInternalTransact();
     quint64 transactId() const;
 
-    //QVariant fetchBlob(ISC_QUAD* bId);
-    //bool writeBlob(XSQLVAR& sqlVar, const QByteArray& ba);
-
-    //QVariant fetchArray(XSQLVAR& sqlVar, ISC_QUAD* arr);
-    //bool writeArray(XSQLVAR& sqlVar, const QList<QVariant>& list);
-
 private:
     DISABLE_DEFAULT_COPY(Result)
 
@@ -199,11 +189,7 @@ private:
     Transaction::Ptr _internalTransact;
     QByteArray       _stmtName;
     PGresultPtr      _stmt;
-//    isc_stmt_handle  _stmt       = {0};
-//    XSQLDA*          _sqlda      = {0};  // output sqlda
-//    XSQLDA*          _inda       = {0};  // input parameters
-//    int              _queryType  = {-1}; // Тип sql-запроса
-    QString          _preparedQuery;     // Содержит подготовленный запрос
+    QString          _preparedQuery; // Содержит подготовленный запрос
 
 };
 
@@ -285,20 +271,14 @@ private:
     void releaseTransactAddr(Transaction*);
     bool transactAddrIsEqual(Transaction*);
 
-//    isc_db_handle* ibase() const {return (isc_db_handle*)&_ibase;}
-//    bool checkError(const char* msg, QSqlError::ErrorType type,
-//                    const char* func, int line);
 private:
     Q_OBJECT
     Driver();
     DISABLE_DEFAULT_COPY(Driver)
 
-//    isc_db_handle    _ibase = {0};
-    //QTextCodec*      _textCodec = {0};
     PGconn*          _connect = {0};
     pid_t            _threadId = {0};
     Transaction*     _transactAddr = {0};
-    //volatile bool  _isOpen = {false};
     std::atomic_bool _operationIsAborted = {false};
 
     friend class Result;
