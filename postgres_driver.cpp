@@ -434,7 +434,7 @@ bool Transaction::isActive() const
     checkError(MSG, ERR_TYPE, pgres, __func__, __LINE__)
 
 #define SET_LAST_ERROR(MSG, ERR_TYPE) { \
-    setLastError(QSqlError("PostgresResult", MSG, ERR_TYPE, 1)); \
+    setLastError(QSqlError("PostgresResult", MSG, ERR_TYPE, "1")); \
     alog::logger().error(__FILE__, __func__, __LINE__, "PostgresDrv") << MSG; \
 }
 
@@ -474,7 +474,7 @@ bool Result::checkError(const char* msg, QSqlError::ErrorType type,
     if (status == PGRES_FATAL_ERROR)
     {
         const char* err = PQerrorMessage(_drv->_connect);
-        setLastError(QSqlError("PostgresResult", msg, type, 1));
+        setLastError(QSqlError("PostgresResult", msg, type, "1"));
         alog::logger().error(__FILE__, func, line, "PostgresDrv") << msg
             << ". Transact: " << addrToNumber(_drv->_connect) << "/" << transactId()
             << ". Detail: "   << err;
@@ -1610,7 +1610,7 @@ bool Driver::open(const QString& db,
     if (!threadSafety)
     {
         const char* msg = "Library libpq is not thread safe";
-        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, 1));
+        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, "1"));
 
         log_error_m << msg;
 
@@ -1658,7 +1658,7 @@ bool Driver::open(const QString& db,
     if (PQstatus(_connect) == CONNECTION_BAD)
     {
         const char* msg = "Error opening database";
-        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, 1));
+        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, "1"));
 
         const char* err = PQerrorMessage(_connect);
         log_error_m << msg << "; Detail: " << err;
@@ -1673,7 +1673,7 @@ bool Driver::open(const QString& db,
     if (protocolVers < 3)
     {
         const char* msg = "PostgreSQL protocol version must be not less than 3";
-        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, 1));
+        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, "1"));
 
         log_error_m << msg;
 
@@ -1687,7 +1687,7 @@ bool Driver::open(const QString& db,
     if (serverVers < 9)
     {
         const char* msg = "PostgreSQL server version must be not less than 9";
-        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, 1));
+        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, "1"));
 
         log_error_m << msg;
 
@@ -1713,7 +1713,7 @@ bool Driver::open(const QString& db,
         if (verMajor < 9)
         {
             const char* msg = "PostgreSQL server version must be not less than 9";
-            setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, 1));
+            setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, "1"));
 
             log_error_m << msg;
 
@@ -1728,7 +1728,7 @@ bool Driver::open(const QString& db,
         PQclear(result);
 
         const char* msg = "Failed get PostgreSQL server version";
-        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, 1));
+        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, "1"));
 
         const char* err = PQerrorMessage(_connection);
         log_error_m << msg << "; Detail: " << err;
@@ -1747,7 +1747,7 @@ bool Driver::open(const QString& db,
     if (status != PGRES_COMMAND_OK)
     {
         const char* msg = "Failed set CLIENT_ENCODING to 'UNICODE'";
-        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, 1));
+        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, "1"));
 
         const char* err = PQerrorMessage(_connect);
         log_error_m << msg << "; Detail: " << err;
@@ -1765,7 +1765,7 @@ bool Driver::open(const QString& db,
     if (PQsetClientEncoding(_connect, "UTF8") == -1)
     {
         const char* msg = "Only UTF8 encoding is support";
-        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, 1));
+        setLastError(QSqlError("PostgresDriver", msg, QSqlError::ConnectionError, "1"));
 
         log_error_m << msg;
 
@@ -1998,7 +1998,7 @@ void Driver::abortOperation()
         if (1 != PQcancel(cancel, errBuff, errBuffSize - 1))
         {
             const char* msg = "Failed abort sql-operation";
-            setLastError(QSqlError("PostgresDriver", msg, QSqlError::UnknownError, 1));
+            setLastError(QSqlError("PostgresDriver", msg, QSqlError::UnknownError, "1"));
 
             log_error_m << msg << "; Detail: " << errBuff;
         }
