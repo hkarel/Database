@@ -65,7 +65,7 @@ static const uint initial_cache_size = 128;
 class SqlCachedResultPrivate
 {
 public:
-    SqlCachedResultPrivate();
+    SqlCachedResultPrivate() = default;
     bool canSeek(int i) const;
     inline int cacheCount() const;
     void init(int count, bool fo);
@@ -74,16 +74,11 @@ public:
     void revertLast();
 
     SqlCachedResult::ValueCache cache;
-    int rowCacheEnd;
-    int colCount;
-    bool forwardOnly;
-    bool atEnd;
+    int  rowCacheEnd = {0};
+    int  colCount    = {0};
+    bool forwardOnly = {false};
+    bool atEnd       = {false};
 };
-
-SqlCachedResultPrivate::SqlCachedResultPrivate():
-    rowCacheEnd(0), colCount(0), forwardOnly(false), atEnd(false)
-{
-}
 
 void SqlCachedResultPrivate::cleanup()
 {
