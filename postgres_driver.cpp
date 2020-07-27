@@ -29,6 +29,7 @@
 #include "shared/prog_abort.h"
 #include "shared/safe_singleton.h"
 #include "shared/logger/logger.h"
+#include "shared/logger/format.h"
 #include "shared/qt/logger_operators.h"
 #include "shared/qt/quuidex.h"
 #include "shared/thread/thread_utils.h"
@@ -41,6 +42,7 @@
 #include <QSqlQuery>
 #include <QVarLengthArray>
 #include <utility>
+#include <functional>
 #include <stdlib.h>
 #include <byteswap.h>
 
@@ -186,6 +188,147 @@ QDate fromDate(qint32 pgdate)
 {
     static const QDate basedate {baseDate()};
     return basedate.addDays(pgdate);
+}
+
+struct QueryParams
+{
+    int    nparams      = {0};
+    char** paramValues  = {0};
+    int*   paramLengths = {0};
+    int*   paramFormats = {0};
+
+    void init(int nparams)
+    {
+        this->nparams = nparams;
+        paramValues  = new char* [nparams];
+        paramLengths = new int   [nparams];
+        paramFormats = new int   [nparams];
+        for (int i = 0; i < nparams; ++i)
+        {
+            paramValues [i] = 0;
+            paramLengths[i] = 0;
+            paramFormats[i] = 1;
+        }
+    }
+    ~QueryParams()
+    {
+        for (int i = 0; i < nparams; ++i)
+            free(paramValues[i]);
+
+        delete [] paramValues;
+        delete [] paramLengths;
+        delete [] paramFormats;
+    }
+};
+
+template<typename T>
+using ArrayFillingFunc = std::function<void (qint32* /*ptrArray*/, QVector<T>& /*array*/)>;
+
+template<typename T>
+bool getArray(PGresultPtr pgres, qint32 fieldType, const char* fieldTypeName,
+              qint32 fieldIndex, ArrayFillingFunc<T> fillingFunc, QVector<T>& array /*out*/)
+{
+    const char* valueBuff = PQgetvalue(pgres, 0, fieldIndex);
+    qint32* pArray = (qint32*) valueBuff;
+
+    // Считываем базовые поля заголовка: ndim, ign, elemtype.
+    qint32 ndim     = bswap_32(*pArray++); // Мерность массива
+    qint32 ign      = bswap_32(*pArray++); // offset for data, removed by libpq
+    qint32 elemtype = bswap_32(*pArray++); // Тип PG
+    (void) ign;
+
+    // Для пустого массива ndim равен 0. Это верно для любой размерности массива.
+    if (ndim == 0)
+    {
+        array.clear();
+        return true;
+    }
+    if (ndim > 1)
+    {
+        log_error_m << "Driver support only one-dimension arrays"
+                    << ". Field index: " << fieldIndex;
+        return false;
+    }
+
+    // Считываем дополнительные поля заголовка
+    qint32 size  = bswap_32(*pArray++); // Количество элементов в массиве
+    qint32 index = bswap_32(*pArray++); // Индекс первого элемента массива ??
+    (void) index;
+
+    if (elemtype != fieldType /*PG_TYPE_INT32*/)
+    {
+        log_error_m << "Type of array not " << fieldTypeName // "PG_TYPE_INT32"
+                    << ". Field index: " << fieldIndex;
+        return  false;
+    }
+
+    // Контрольная проверка размера массива
+    int len = PQgetlength(pgres, 0, fieldIndex);
+    int arraySize = (len - 5 * sizeof(qint32)) / (sizeof(qint32) + sizeof(T));
+    if (arraySize != size)
+    {
+        break_point
+
+        log_error_m << "Size of array incorrect"
+                    << ". Field index: " << fieldIndex;
+        return false;
+    }
+
+    // Считываем массив данных
+    array.resize(size);
+    fillingFunc(pArray, array);
+
+    return true;
+}
+
+template<typename T>
+bool setArray(qint32 paramType, const char* paramTypeName, qint32 paramIndex,
+              const QVariant& value, ArrayFillingFunc<T> fillingFunc, QueryParams& params)
+{
+    typedef QVector<T> ArrayType;
+
+    if (!value.canConvert<ArrayType>())
+    {
+        log_error_m << log_format("Query param%? can't convert to Vector<%?> type",
+                                  paramIndex, paramTypeName);
+        return false;
+    }
+
+    ArrayType array = value.value<ArrayType>();
+
+    int sz = 3 * sizeof(qint32);
+    if (!array.empty())
+    {
+        //   размер заголовка     размер массива данных
+        sz = 5 * sizeof(qint32) + array.count() * (sizeof(quint32) + sizeof(T));
+    }
+
+    params.paramValues[paramIndex] = (char*)malloc(sz);
+    params.paramLengths[paramIndex] = sz;
+
+    qint32* pArray = (qint32*)params.paramValues[paramIndex];
+
+    qint32 ndim = (array.empty()) ? 0 : 1; // Размерность массива
+    qint32 ign = 0;                        // ?
+    qint32 elemtype = paramType;           // Тип PG
+    qint32 size = array.count();           // Длина массива
+    qint32 index = 0;                      // Индекс первого элемента массива
+
+    // Записываем базовые поля заголовка: ndim, ign, elemtype.
+    *pArray++ = bswap_32(ndim);
+    *pArray++ = bswap_32(ign);
+    *pArray++ = bswap_32(elemtype);
+
+    if (!array.empty())
+    {
+        // Записываем дополнительные поля заголовка
+        *pArray++ = bswap_32(size);
+        *pArray++ = bswap_32(index);
+
+        // Записываем массив данных
+        fillingFunc(pArray, array);
+    }
+    return true;
 }
 
 } // namespace
@@ -698,37 +841,6 @@ bool Result::prepare(const QString& query)
     return true;
 }
 
-struct QueryParams
-{
-    int    nparams      = {0};
-    char** paramValues  = {0};
-    int*   paramLengths = {0};
-    int*   paramFormats = {0};
-
-    void init(int nparams)
-    {
-        this->nparams = nparams;
-        paramValues  = new char* [nparams];
-        paramLengths = new int   [nparams];
-        paramFormats = new int   [nparams];
-        for (int i = 0; i < nparams; ++i)
-        {
-            paramValues [i] = 0;
-            paramLengths[i] = 0;
-            paramFormats[i] = 1;
-        }
-    }
-    ~QueryParams()
-    {
-        for (int i = 0; i < nparams; ++i)
-            free(paramValues[i]);
-
-        delete [] paramValues;
-        delete [] paramLengths;
-        delete [] paramFormats;
-    }
-};
-
 bool Result::exec()
 {
     pid_t threadId = trd::gettid();
@@ -965,7 +1077,9 @@ bool Result::exec()
                 {
                     if (!val.canConvert<QVector<qint32>>())
                     {
-                        QString msg = "Query param%1 can't convert to Vector<INT> type. Transact: %2/%3";
+                        QString msg =
+                            "Query param%1 can't convert to Vector<PG_TYPE_INT32> type"
+                            ". Transact: %2/%3";
                         msg = msg.arg(i)
                                  .arg(addrToNumber(_drv->_connect))
                                  .arg(transactId());
@@ -974,47 +1088,63 @@ bool Result::exec()
                         return false;
                     }
 
-                    QVector<qint32> arr = val.value<QVector<qint32>>();
-
-                    int sz = 3 * int(sizeof(qint32));
-                    if (!arr.empty())
-                        sz = (arr.count() * 2 + 5) * int(sizeof(qint32));
-
-                    params.paramValues[i] = (char*)malloc(sz);
-                    params.paramLengths[i] = sz;
-
-                    qint32* v = (qint32*)params.paramValues[i];
-
-                    qint32 ndim = (arr.empty()) ? 0 : 1; // Размерность массива
-                    qint32 ign = 0;                      // ?
-                    qint32 elemtype = PG_TYPE_INT32;     // Тип PG для INT4
-                    qint32 size = arr.count();           // Длина массива
-                    qint32 index = 0;                    // Индекс первого элемента массива
-
-                    *v++ = bswap_32(ndim);
-                    *v++ = bswap_32(ign);
-                    *v++ = bswap_32(elemtype);
-
-                    // Если массив пустой, нужно записвать только заголовок из трех
-                    // полей: ndim, ign, elemtype.
-                    if (!arr.empty())
+                    auto fillingFunc = [](qint32* ptrArray, QVector<qint32>& array)
                     {
-                        *v++ = bswap_32(size);
-                        *v++ = bswap_32(index);
-
-                        for (const qint32 item : arr)
+                        for (const qint32 item : array)
                         {
-                            *v++ = bswap_32((qint32)sizeof(qint32));
-                            *v++ = bswap_32(item);
+                            *ptrArray++ = bswap_32((qint32)sizeof(qint32));
+                            *ptrArray++ = bswap_32(item);
                         }
+                    };
+                    if (!setArray<qint32>(PG_TYPE_INT32, "PG_TYPE_INT32", i, val, fillingFunc, params))
+                    {
+                        return false;
                     }
                     break;
+
+//                    QVector<qint32> arr = val.value<QVector<qint32>>();
+
+//                    int sz = 3 * int(sizeof(qint32));
+//                    if (!arr.empty())
+//                        sz = (arr.count() * 2 + 5) * int(sizeof(qint32));
+
+//                    params.paramValues[i] = (char*)malloc(sz);
+//                    params.paramLengths[i] = sz;
+
+//                    qint32* v = (qint32*)params.paramValues[i];
+
+//                    qint32 ndim = (arr.empty()) ? 0 : 1; // Размерность массива
+//                    qint32 ign = 0;                      // ?
+//                    qint32 elemtype = PG_TYPE_INT32;     // Тип PG для INT4
+//                    qint32 size = arr.count();           // Длина массива
+//                    qint32 index = 0;                    // Индекс первого элемента массива
+
+//                    *v++ = bswap_32(ndim);
+//                    *v++ = bswap_32(ign);
+//                    *v++ = bswap_32(elemtype);
+
+//                    // Если массив пустой, нужно записвать только заголовок из трех
+//                    // полей: ndim, ign, elemtype.
+//                    if (!arr.empty())
+//                    {
+//                        *v++ = bswap_32(size);
+//                        *v++ = bswap_32(index);
+
+//                        for (const qint32 item : arr)
+//                        {
+//                            *v++ = bswap_32((qint32)sizeof(qint32));
+//                            *v++ = bswap_32(item);
+//                        }
+//                    }
+//                    break;
                 }
                 case PG_TYPE_UUID_ARRAY:
                 {
                     if (!val.canConvert<QVector<QUuidEx>>())
                     {
-                        QString msg = "Query param%1 can't convert to Vector<UUID> type. Transact: %2/%3";
+                        QString msg =
+                            "Query param%1 can't convert to Vector<PG_TYPE_UUID> type"
+                            ". Transact: %2/%3";
                         msg = msg.arg(i)
                                  .arg(addrToNumber(_drv->_connect))
                                  .arg(transactId());
@@ -1023,42 +1153,59 @@ bool Result::exec()
                         return false;
                     }
 
-                    QVector<QUuidEx> arr = val.value<QVector<QUuidEx>>();
-
-                    int sz = 3 * int(sizeof(qint32));
-                    if (!arr.empty())
-                        sz = 5 * int(sizeof(quint32)) + (arr.count() * int(sizeof(quint32) + sizeof(QUuidEx)));
-
-                    params.paramValues[i] = (char*)malloc(sz);
-                    params.paramLengths[i] = sz;
-
-                    qint32* v = (qint32*)params.paramValues[i];
-
-                    qint32 ndim = (arr.empty()) ? 0 : 1; // Размерность массива
-                    qint32 ign = 0;                      // ?
-                    qint32 elemtype = PG_TYPE_UUID;      // Тип PG для UUID
-                    qint32 size = arr.count();           // Длина массива
-                    qint32 index = 0;                    // Индекс первого элемента массива
-
-                    *v++ = bswap_32(ndim);
-                    *v++ = bswap_32(ign);
-                    *v++ = bswap_32(elemtype);
-
-                    if (!arr.empty())
+                    auto fillingFunc = [](qint32* ptrArray, QVector<QUuidEx>& array)
                     {
-                        *v++ = bswap_32(size);
-                        *v++ = bswap_32(index);
-
-                        for (const QUuidEx item : arr)
+                        for (const QUuidEx& item : array)
                         {
-                            *v++ = bswap_32((qint32)sizeof(QUuidEx));
+                            *ptrArray++ = bswap_32((qint32)sizeof(QUuidEx));
 
                             const QByteArray& ba = item.toRfc4122();
-                            memcpy(v, ba.constData(), 16);
-                            v += 4;
+                            memcpy(ptrArray, ba.constData(), 16);
+                            ptrArray += 4;
                         }
+                    };
+                    if (!setArray<QUuidEx>(PG_TYPE_UUID, "PG_TYPE_UUID", i, val, fillingFunc, params))
+                    {
+                        return false;
                     }
                     break;
+
+//                    QVector<QUuidEx> arr = val.value<QVector<QUuidEx>>();
+
+//                    int sz = 3 * int(sizeof(qint32));
+//                    if (!arr.empty())
+//                        sz = 5 * int(sizeof(quint32)) + (arr.count() * int(sizeof(quint32) + sizeof(QUuidEx)));
+
+//                    params.paramValues[i] = (char*)malloc(sz);
+//                    params.paramLengths[i] = sz;
+
+//                    qint32* v = (qint32*)params.paramValues[i];
+
+//                    qint32 ndim = (arr.empty()) ? 0 : 1; // Размерность массива
+//                    qint32 ign = 0;                      // ?
+//                    qint32 elemtype = PG_TYPE_UUID;      // Тип PG для UUID
+//                    qint32 size = arr.count();           // Длина массива
+//                    qint32 index = 0;                    // Индекс первого элемента массива
+
+//                    *v++ = bswap_32(ndim);
+//                    *v++ = bswap_32(ign);
+//                    *v++ = bswap_32(elemtype);
+
+//                    if (!arr.empty())
+//                    {
+//                        *v++ = bswap_32(size);
+//                        *v++ = bswap_32(index);
+
+//                        for (const QUuidEx item : arr)
+//                        {
+//                            *v++ = bswap_32((qint32)sizeof(QUuidEx));
+
+//                            const QByteArray& ba = item.toRfc4122();
+//                            memcpy(v, ba.constData(), 16);
+//                            v += 4;
+//                        }
+//                    }
+//                    break;
                 }
                 default:
                 {
@@ -1387,138 +1534,180 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
             }
             case PG_TYPE_INT4_ARRAY:
             {
-                using VectorEmpty = QVector<qint32>;
-                qint32* pArray  = (qint32 *)value;
-
-                // ndim, ign, elemtype - базовые поля заголовка для типа ARRAY.
-                // Данные значения заполняются всегда.
-                qint32 ndim     = bswap_32(*pArray++); (void)ndim;     // Мерность массива
-                qint32 ign      = bswap_32(*pArray++); (void)ign;      // offset for data, removed by libpq
-                qint32 elemtype = bswap_32(*pArray++); (void)elemtype; // Тип PG для INT4
-
-                qint32 size     = bswap_32(*pArray++); (void)size;     // количество строк для двумерного массива
-                qint32 index    = bswap_32(*pArray++); (void)index;    // Индекс первого элемента массива
-
-                // В случае, если массив пустой то ndim равен 0. Это верно для
-                // любой размерности массива.
-                if (ndim == 0)
+                QVector<qint32> array;
+                auto fillingFunc = [](qint32* ptrArray, QVector<qint32>& array)
                 {
-                    row[idx].setValue(VectorEmpty());
-                    break;
-                }
-
-                if (ndim > 1)
+                    for (int i = 0; i < array.count(); ++i)
+                    {
+                        ++ptrArray; // Пропустить размер значения
+                        array[i] = bswap_32(*ptrArray++);
+                    }
+                };
+                if (!getArray<qint32>(pgres, PG_TYPE_INT32, "PG_TYPE_INT32", i, fillingFunc, array))
                 {
-                    log_error_m << "Driver support only one-dimension arrays"
-                                << ". Field index: " << i;
-                    //row[idx].setValue(VectorEmpty());
-                    setAt(QSql::AfterLastRow);
-                    return false;
-                }
-
-                if (elemtype != PG_TYPE_INT32)
-                {
-                    log_error_m << "Type of array not PG_TYPE_INT32"
-                                << ". Field index: " << i;
-                    //row[idx].setValue(VectorEmpty());
                     setAt(QSql::AfterLastRow);
                     return  false;
                 }
 
-                // Контрольная проверка размера массива
-                int len = PQgetlength(pgres, 0, i);
-                int arrSize = (len - 5 * sizeof(qint32)) / (2 * sizeof(qint32));
-                if (arrSize != size)
-                {
-                    break_point
-
-                    log_error_m << "Size of array incorrect"
-                                << ". Field index: " << i;
-                    //row[idx].setValue(VectorEmpty());
-                    setAt(QSql::AfterLastRow);
-                    return false;
-                }
-
-                QVector<qint32> arr;
-                arr.resize(size);
-                for (int i = 0; i < size; i ++)
-                {
-                    ++pArray; // Пропустить размер значения
-                    arr[i] = bswap_32(*pArray++);
-                }
-                row[idx].setValue(arr);
+                row[idx].setValue(array);
                 break;
+
+                //using VectorEmpty = QVector<qint32>;
+                //qint32* pArray  = (qint32 *)value;
+
+//                // ndim, ign, elemtype - базовые поля заголовка для типа ARRAY.
+//                // Данные значения заполняются всегда.
+//                qint32 ndim     = bswap_32(*pArray++); (void)ndim;     // Мерность массива
+//                qint32 ign      = bswap_32(*pArray++); (void)ign;      // offset for data, removed by libpq
+//                qint32 elemtype = bswap_32(*pArray++); (void)elemtype; // Тип PG для INT4
+
+//                qint32 size     = bswap_32(*pArray++); (void)size;     // количество строк для двумерного массива
+//                qint32 index    = bswap_32(*pArray++); (void)index;    // Индекс первого элемента массива
+
+//                // В случае, если массив пустой то ndim равен 0. Это верно для
+//                // любой размерности массива.
+//                if (ndim == 0)
+//                {
+//                    row[idx].setValue(VectorEmpty());
+//                    break;
+//                }
+
+//                if (ndim > 1)
+//                {
+//                    log_error_m << "Driver support only one-dimension arrays"
+//                                << ". Field index: " << i;
+//                    //row[idx].setValue(VectorEmpty());
+//                    setAt(QSql::AfterLastRow);
+//                    return false;
+//                }
+
+//                if (elemtype != PG_TYPE_INT32)
+//                {
+//                    log_error_m << "Type of array not PG_TYPE_INT32"
+//                                << ". Field index: " << i;
+//                    //row[idx].setValue(VectorEmpty());
+//                    setAt(QSql::AfterLastRow);
+//                    return  false;
+//                }
+
+//                // Контрольная проверка размера массива
+//                int len = PQgetlength(pgres, 0, i);
+//                int arrSize = (len - 5 * sizeof(qint32)) / (2 * sizeof(qint32));
+//                if (arrSize != size)
+//                {
+//                    break_point
+
+//                    log_error_m << "Size of array incorrect"
+//                                << ". Field index: " << i;
+//                    //row[idx].setValue(VectorEmpty());
+//                    setAt(QSql::AfterLastRow);
+//                    return false;
+//                }
+
+//                QVector<qint32> arr;
+//                arr.resize(size);
+//                for (int i = 0; i < size; i ++)
+//                {
+//                    ++pArray; // Пропустить размер значения
+//                    arr[i] = bswap_32(*pArray++);
+//                }
+//                row[idx].setValue(arr);
+//                break;
             }
             case PG_TYPE_UUID_ARRAY:
             {
-                using VectorEmpty = QVector<QUuidEx>;
-                qint32* pArray  = (qint32 *)value;
-
-                // ndim, ign, elemtype - базовые поля заголовка для типа ARRAY.
-                // Данные значения заполняются всегда.
-                qint32 ndim     = bswap_32(*pArray++); (void)ndim;     // Размерность массива
-                qint32 ign      = bswap_32(*pArray++); (void)ign;      // offset for data, removed by libpq
-                qint32 elemtype = bswap_32(*pArray++); (void)elemtype; // Тип PG для INT4
-
-                qint32 size     = bswap_32(*pArray++); (void)size;     // Количество строк для двумерного массива
-                qint32 index    = bswap_32(*pArray++); (void)index;    // Индекс первого элемента массива
-
-
-                // В случае, если массив пустой то ndim равен 0. Это верно для
-                // любой размерности массива.
-                if (ndim == 0)
+                QVector<QUuidEx> array;
+                auto fillingFunc = [](qint32* ptrArray, QVector<QUuidEx>& array)
                 {
-                    row[idx].setValue(VectorEmpty());
-                    break;
-                }
+                    for (int i = 0; i < array.count(); ++i)
+                    {
+                        ++ptrArray; // Пропустить размер значения
 
-                if (ndim > 1)
+                        const QUuid& uuid =
+                            QUuid::fromRfc4122(QByteArray::fromRawData((char*)ptrArray, 16));
+                        const QUuidEx& uuidex = static_cast<const QUuidEx&>(uuid);
+
+                        array[i] = uuidex;
+                        ptrArray = ptrArray + 4;
+                    }
+                };
+                if (!getArray<QUuidEx>(pgres, PG_TYPE_UUID, "PG_TYPE_UUID", i, fillingFunc, array))
                 {
-                    log_error_m << "Driver support only one-dimension arrays"
-                                << ". Field index: " << i;
-                    //row[idx].setValue(VectorEmpty());
                     setAt(QSql::AfterLastRow);
-                    return false;
+                    return  false;
                 }
 
-                if (elemtype != PG_TYPE_UUID)
-                {
-                    log_error_m << "Type of array not PG_TYPE_UUID"
-                                << ". Field index: " << i;
-                    //row[idx].setValue(VectorEmpty());
-                    setAt(QSql::AfterLastRow);
-                    return false;
-                }
-
-                // Контрольная проверка размера массива
-                int len = PQgetlength(pgres, 0, i);
-                int arrSize = (len - 5 * sizeof(qint32)) / (4 + sizeof(QUuidEx));
-                if (arrSize != size)
-                {
-                    break_point
-
-                    log_error_m << "Size of array incorrect"
-                                << ". Field index: " << i;
-                    //row[idx].setValue(VectorEmpty());
-                    setAt(QSql::AfterLastRow);
-                    return false;
-                }
-
-                QVector<QUuidEx> arr;
-                arr.resize(size);
-                for (int i = 0; i < size; ++i)
-                {
-                    ++pArray; // Пропустить размер значения
-
-                    const QUuid& uuid =
-                        QUuid::fromRfc4122(QByteArray::fromRawData((char*)pArray, 16));
-                    const QUuidEx& uuidex = static_cast<const QUuidEx&>(uuid);
-
-                    arr[i] = uuidex;
-                    pArray = pArray + 4;
-                }
-                row[idx].setValue(arr);
+                row[idx].setValue(array);
                 break;
+
+//                using VectorEmpty = QVector<QUuidEx>;
+//                qint32* pArray  = (qint32 *)value;
+
+//                // ndim, ign, elemtype - базовые поля заголовка для типа ARRAY.
+//                // Данные значения заполняются всегда.
+//                qint32 ndim     = bswap_32(*pArray++); (void)ndim;     // Размерность массива
+//                qint32 ign      = bswap_32(*pArray++); (void)ign;      // offset for data, removed by libpq
+//                qint32 elemtype = bswap_32(*pArray++); (void)elemtype; // Тип PG для INT4
+
+//                qint32 size     = bswap_32(*pArray++); (void)size;     // Количество строк для двумерного массива
+//                qint32 index    = bswap_32(*pArray++); (void)index;    // Индекс первого элемента массива
+
+
+//                // В случае, если массив пустой то ndim равен 0. Это верно для
+//                // любой размерности массива.
+//                if (ndim == 0)
+//                {
+//                    row[idx].setValue(VectorEmpty());
+//                    break;
+//                }
+
+//                if (ndim > 1)
+//                {
+//                    log_error_m << "Driver support only one-dimension arrays"
+//                                << ". Field index: " << i;
+//                    //row[idx].setValue(VectorEmpty());
+//                    setAt(QSql::AfterLastRow);
+//                    return false;
+//                }
+
+//                if (elemtype != PG_TYPE_UUID)
+//                {
+//                    log_error_m << "Type of array not PG_TYPE_UUID"
+//                                << ". Field index: " << i;
+//                    //row[idx].setValue(VectorEmpty());
+//                    setAt(QSql::AfterLastRow);
+//                    return false;
+//                }
+
+//                // Контрольная проверка размера массива
+//                int len = PQgetlength(pgres, 0, i);
+//                int arrSize = (len - 5 * sizeof(qint32)) / (4 + sizeof(QUuidEx));
+//                if (arrSize != size)
+//                {
+//                    break_point
+
+//                    log_error_m << "Size of array incorrect"
+//                                << ". Field index: " << i;
+//                    //row[idx].setValue(VectorEmpty());
+//                    setAt(QSql::AfterLastRow);
+//                    return false;
+//                }
+
+//                QVector<QUuidEx> arr;
+//                arr.resize(size);
+//                for (int i = 0; i < size; ++i)
+//                {
+//                    ++pArray; // Пропустить размер значения
+
+//                    const QUuid& uuid =
+//                        QUuid::fromRfc4122(QByteArray::fromRawData((char*)pArray, 16));
+//                    const QUuidEx& uuidex = static_cast<const QUuidEx&>(uuid);
+
+//                    arr[i] = uuidex;
+//                    pArray = pArray + 4;
+//                }
+//                row[idx].setValue(arr);
+//                break;
             }
             default:
                 row[idx] = QVariant();
