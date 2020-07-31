@@ -225,7 +225,7 @@ template<typename T>
 using ArrayFillingFunc = std::function<void (qint32* /*ptrArray*/, QVector<T>& /*array*/)>;
 
 template<typename T>
-bool getArray(PGresultPtr pgres, qint32 fieldType, const char* fieldTypeName,
+bool getArray(const PGresultPtr& pgres, qint32 fieldType, const char* fieldTypeName,
               qint32 fieldIndex, ArrayFillingFunc<T> fillingFunc, QVector<T>& array /*out*/)
 {
     const char* valueBuff = PQgetvalue(pgres, 0, fieldIndex);
