@@ -567,6 +567,9 @@ char* qFillBufferWithByteArray(char* buffer, short buflen, const QByteArray& ba,
     return buffer;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+
 char* createArrayBuffer(char* buffer, const QList<QVariant>& list,
                         QVariant::Type type, short curDim, ISC_ARRAY_DESC* arrayDesc,
                         QString& error, const QTextCodec* tc)
@@ -667,6 +670,8 @@ char* createArrayBuffer(char* buffer, const QList<QVariant>& list,
     }
     return buffer;
 }
+
+#pragma GCC diagnostic pop
 
 //typedef QMap<void*, Driver*> QFirebirdBufferDriverMap;
 //Q_GLOBAL_STATIC(QFirebirdBufferDriverMap, qBufferDriverMap)
@@ -2481,6 +2486,9 @@ QSqlIndex Driver::primaryIndex(const QString& tableName) const
     return index;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+
 QString Driver::formatValue(const QSqlField& field, bool trimStrings) const
 {
     switch (field.type())
@@ -2536,6 +2544,8 @@ QString Driver::formatValue(const QSqlField& field, bool trimStrings) const
             return QSqlDriver::formatValue(field, trimStrings);
     }
 }
+
+#pragma GCC diagnostic pop
 
 namespace {
 void qEventCallback(void* result, ISC_USHORT length, const ISC_UCHAR* updated)
