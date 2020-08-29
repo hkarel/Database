@@ -259,7 +259,7 @@ bool getArray(const PGresultPtr& pgres, qint32 fieldType, const char* fieldTypeN
     {
         log_error_m << "Type of array not " << fieldTypeName // "PG_TYPE_INT32"
                     << ". Field index: " << fieldIndex;
-        return  false;
+        return false;
     }
 
     // Контрольная проверка размера массива
@@ -1473,7 +1473,7 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
                 if (!getArray<qint32>(pgres, PG_TYPE_INT32, "PG_TYPE_INT32", i, fillingFunc, array))
                 {
                     setAt(QSql::AfterLastRow);
-                    return  false;
+                    return false;
                 }
 
                 row[idx].setValue(array);
@@ -1499,7 +1499,7 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
                 if (!getArray<QUuidEx>(pgres, PG_TYPE_UUID, "PG_TYPE_UUID", i, fillingFunc, array))
                 {
                     setAt(QSql::AfterLastRow);
-                    return  false;
+                    return false;
                 }
 
                 row[idx].setValue(array);
