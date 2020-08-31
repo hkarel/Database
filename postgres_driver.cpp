@@ -1695,17 +1695,22 @@ bool Driver::open(const QString& db,
     if (port != -1)
         connString += (QString(" port=%1")).arg(quote(QString::number(port)));
 
-    if (!connOpts.isEmpty())
+    QString options = connOpts.trimmed();
+    if (!options.isEmpty())
     {
-        QString opt = connOpts;
-        opt.replace(QChar(';'), QChar(' '), Qt::CaseInsensitive);
-        connString.append(QChar(' ')).append(opt);
+        QString options_ = options;
+        options_.replace(QChar(';'), QChar(' '), Qt::CaseInsensitive);
+        connString.append(QChar(' ')).append(options_);
     }
 
-    log_verbose_m << "Try open database '" << db << "'"
-                  << ". User: " << user
-                  << ", host: " << host
-                  << ", port: " << port;
+    { //Block for alog::Line
+        alog::Line logLine = log_verbose_m << "Try open database '" << db << "'"
+                                           << ". User: " << user
+                                           << ", host: " << host
+                                           << ", port: " << port;
+        if (!options.isEmpty())
+            logLine << ", options: " << options;
+    }
 
     _connect = PQconnectdb(connString.toUtf8());
     if (PQstatus(_connect) == CONNECTION_BAD)
