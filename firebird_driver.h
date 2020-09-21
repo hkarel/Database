@@ -63,7 +63,7 @@ class Result;
 class Driver;
 typedef clife_ptr<Driver> DriverPtr;
 
-class Transaction : public clife_base
+class Transaction final : public clife_base
 {
 public:
     typedef clife_ptr<Transaction> Ptr;
@@ -100,7 +100,7 @@ struct AutoRollbackTransact
     db::firebird::AutoRollbackTransact __fb_autorollback_transact__(TRANSACT); \
     (void) __fb_autorollback_transact__;
 
-class Result : public SqlCachedResult
+class Result final : public SqlCachedResult
 {
 public:
     enum class ForwardOnly {No = 0, Yes = 1};
@@ -153,7 +153,7 @@ private:
     QString          _preparedQuery;     // Содержит подготовленный запрос
 };
 
-class Driver : public QSqlDriver, public clife_base
+class Driver final : public QSqlDriver, public clife_base
 {
 public:
     typedef DriverPtr Ptr;
