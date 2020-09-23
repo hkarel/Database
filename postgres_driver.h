@@ -56,7 +56,7 @@ template<typename> struct PGresultDestroy
 };
 typedef container_ptr<PGresult, PGresultDestroy> PGresultPtr;
 
-class Transaction : public clife_base
+class Transaction final : public clife_base
 {
 public:
     typedef clife_ptr<Transaction> Ptr;
@@ -131,7 +131,7 @@ private:
     friend Transaction::Ptr createTransact(const DriverPtr&);
 };
 
-class Result : public SqlCachedResult /*QSqlResult*/
+class Result final : public SqlCachedResult /*QSqlResult*/
 {
 public:
     enum class ForwardOnly {No = 0, Yes = 1};
@@ -193,7 +193,7 @@ private:
 
 };
 
-class Driver : public QSqlDriver, public clife_base
+class Driver final : public QSqlDriver, public clife_base
 {
 public:
     typedef DriverPtr Ptr;

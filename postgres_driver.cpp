@@ -41,9 +41,9 @@
 #include <QSqlIndex>
 #include <QSqlQuery>
 #include <QVarLengthArray>
+#include <cstdlib>
 #include <utility>
 #include <functional>
-#include <stdlib.h>
 #include <byteswap.h>
 
 #define log_error_m   alog::logger().error  (__FILE__, __func__, __LINE__, "PostgresDrv")
@@ -197,6 +197,19 @@ struct QueryParams
     int*   paramLengths = {0};
     int*   paramFormats = {0};
 
+    QueryParams() = default;
+    DISABLE_DEFAULT_COPY(QueryParams)
+
+    ~QueryParams()
+    {
+        for (int i = 0; i < nparams; ++i)
+            free(paramValues[i]);
+
+        delete [] paramValues;
+        delete [] paramLengths;
+        delete [] paramFormats;
+    }
+
     void init(int nparams)
     {
         this->nparams = nparams;
@@ -209,15 +222,6 @@ struct QueryParams
             paramLengths[i] = 0;
             paramFormats[i] = 1;
         }
-    }
-    ~QueryParams()
-    {
-        for (int i = 0; i < nparams; ++i)
-            free(paramValues[i]);
-
-        delete [] paramValues;
-        delete [] paramLengths;
-        delete [] paramFormats;
     }
 };
 
@@ -456,7 +460,8 @@ bool Transaction::begin(IsolationLevel isolationLevel, WritePolicy writePolicy)
     //Oid pgType = PQparamtype(res, 0);
     //int iii = PQgetlength(res, 0, 0);
     char* val = PQgetvalue(pgres, 0, 0);
-    _transactId = atoi(val);
+    //_transactId = atoi(val);
+    _transactId = strtoull(val, nullptr, 10);
     _isActive = true;
 
     log_debug2_m << "Transaction begin: "
