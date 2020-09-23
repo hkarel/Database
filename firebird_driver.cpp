@@ -52,8 +52,8 @@
 #include <QSqlIndex>
 #include <QSqlQuery>
 #include <QVarLengthArray>
+#include <cstdlib>
 #include <utility>
-#include <stdlib.h>
 
 #define log_error_m   alog::logger().error  (__FILE__, __func__, __LINE__, "FirebirdDrv")
 #define log_warn_m    alog::logger().warn   (__FILE__, __func__, __LINE__, "FirebirdDrv")
@@ -297,7 +297,7 @@ ISC_TIMESTAMP toTimeStamp(const QDateTime& dt)
     return ts;
 }
 
-QDateTime fromTimeStamp(char* buffer)
+QDateTime fromTimeStamp(const char* buffer)
 {
     static const QTime midnight {0, 0, 0, 0};
     static const QDate basedate {1858, 11, 17};
@@ -315,7 +315,7 @@ ISC_TIME toTime(const QTime& t)
     return (ISC_TIME)midnight.msecsTo(t) * 10;
 }
 
-QTime fromTime(char* buffer)
+QTime fromTime(const char* buffer)
 {
     static const QTime midnight {0, 0, 0, 0};
     // have to demangle the structure ourselves because isc_decode_time
@@ -331,7 +331,7 @@ ISC_DATE toDate(const QDate& t)
     return date;
 }
 
-QDate fromDate(char* buffer)
+QDate fromDate(const char* buffer)
 {
     static const QDate basedate {1858, 11, 17};
     // have to demangle the structure ourselves because isc_decode_time
@@ -346,28 +346,28 @@ QByteArray encodeString(const QTextCodec* tc, const QString& str)
 }
 
 template<typename T>
-QList<QVariant> toList(char** buf, int count, T* = 0)
+QList<QVariant> toList(char** buf, int count)
 {
     QList<QVariant> res;
     for (int i = 0; i < count; ++i)
     {
-        res.append(*(T*)(*buf));
+        T value = *(T*)(*buf);
+        res.append(value);
         *buf += sizeof(T);
     }
     return res;
 }
 
 /* char** ? seems like bad influence from oracle ... */
-template<>
-QList<QVariant> toList<long>(char** buf, int count, long*)
+QList<QVariant> toListLong(char** buf, int count)
 {
     QList<QVariant> res;
     for (int i = 0; i < count; ++i)
     {
         if (sizeof(int) == sizeof(long))
-            res.append(int((*(long*)(*buf))));
+            res.append(int(*(long*)(*buf)));
         else
-            res.append((qint64)(*(long*)(*buf)));
+            res.append(qint64(*(long*)(*buf)));
 
         *buf += sizeof(long);
     }
@@ -415,7 +415,7 @@ char* readArrayBuffer(QList<QVariant>& list, char* buffer, short curDim,
                 break;
 
             case blr_long:
-                valList = toList<long>(&buffer, numElements[dim], static_cast<long*>(0));
+                valList = toListLong(&buffer, numElements[dim]);
                 break;
 
             case blr_short:
@@ -473,7 +473,7 @@ char* readArrayBuffer(QList<QVariant>& list, char* buffer, short curDim,
 }
 
 template<typename T>
-char* fillList(char* buffer, const QList<QVariant>& list, T* = 0)
+char* fillList(char* buffer, const QList<QVariant>& list)
 {
     for (int i = 0; i < list.size(); ++i)
     {
@@ -485,8 +485,7 @@ char* fillList(char* buffer, const QList<QVariant>& list, T* = 0)
     return buffer;
 }
 
-template<>
-char* fillList<float>(char* buffer, const QList<QVariant>& list, float*)
+char* fillListFloat(char* buffer, const QList<QVariant>& list)
 {
     for (int i = 0; i < list.size(); ++i)
     {
@@ -619,7 +618,7 @@ char* createArrayBuffer(char* buffer, const QList<QVariant>& list,
 
             case QVariant::Double:
                 if (arrayDesc->array_desc_dtype == blr_float)
-                    buffer = fillList<float>(buffer, list, static_cast<float*>(0));
+                    buffer = fillListFloat(buffer, list);
                 else
                     buffer = fillList<double>(buffer, list);
                 break;
@@ -1048,8 +1047,8 @@ bool Result::prepare(const QString& query)
         return false;
     }
 
-    isc_dsql_prepare(status, transact(), &_stmt, 0,
-                     const_cast<char*>(encodeString(_drv->_textCodec, query).constData()),
+    QByteArray qstr = encodeString(_drv->_textCodec, query);
+    isc_dsql_prepare(status, transact(), &_stmt, 0, qstr.constData(),
                      FBVERSION, _sqlda);
     if (CHECK_ERROR("Could not prepare statement", QSqlError::StatementError))
     {
@@ -1460,7 +1459,7 @@ bool Result::writeBlob(XSQLVAR& sqlVar, const QByteArray& ba)
         isc_put_segment(status, &handle, qMin(ba.size() - j, int(FirebirdChunkSize)),
                         // [Karelin]
                         // const_cast<char*>(ba.data()) + i);
-                        const_cast<char*>(ba.constData()) + j);
+                        ba.constData() + j);
 
         if (CHECK_ERROR("Unable to write BLOB", QSqlError::UnknownError))
             return false;
@@ -2567,8 +2566,6 @@ void qEventCallback(void* result, ISC_USHORT length, const ISC_UCHAR* updated)
     //                              Q_ARG(void* , reinterpret_cast<void*>(result)));
 
     //qHandleEventNotification(reinterpret_cast<void*>(result));
-
-    return;
 }
 } // namespace
 
