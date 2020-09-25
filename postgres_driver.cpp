@@ -455,12 +455,7 @@ bool Transaction::begin(IsolationLevel isolationLevel, WritePolicy writePolicy)
         return false;
     }
 
-    //int ll = PQbinaryTuples(res);
-    //int n = PQnfields(res);
-    //Oid pgType = PQparamtype(res, 0);
-    //int iii = PQgetlength(res, 0, 0);
     char* val = PQgetvalue(pgres, 0, 0);
-    //_transactId = atoi(val);
     _transactId = strtoull(val, nullptr, 10);
     _isActive = true;
 
