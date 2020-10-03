@@ -46,12 +46,12 @@
 #include <functional>
 #include <byteswap.h>
 
-#define log_error_m   alog::logger().error  (__FILE__, __func__, __LINE__, "PostgresDrv")
-#define log_warn_m    alog::logger().warn   (__FILE__, __func__, __LINE__, "PostgresDrv")
-#define log_info_m    alog::logger().info   (__FILE__, __func__, __LINE__, "PostgresDrv")
-#define log_verbose_m alog::logger().verbose(__FILE__, __func__, __LINE__, "PostgresDrv")
-#define log_debug_m   alog::logger().debug  (__FILE__, __func__, __LINE__, "PostgresDrv")
-#define log_debug2_m  alog::logger().debug2 (__FILE__, __func__, __LINE__, "PostgresDrv")
+#define log_error_m   alog::logger().error   (alog_line_location, "PostgresDrv")
+#define log_warn_m    alog::logger().warn    (alog_line_location, "PostgresDrv")
+#define log_info_m    alog::logger().info    (alog_line_location, "PostgresDrv")
+#define log_verbose_m alog::logger().verbose (alog_line_location, "PostgresDrv")
+#define log_debug_m   alog::logger().debug   (alog_line_location, "PostgresDrv")
+#define log_debug2_m  alog::logger().debug2  (alog_line_location, "PostgresDrv")
 
 #define PG_TYPE_BOOL        16   // QBOOLOID
 #define PG_TYPE_INT8        18   // OINT1OID
@@ -578,7 +578,7 @@ bool Transaction::isActive() const
 
 #define SET_LAST_ERROR(MSG, ERR_TYPE) { \
     setLastError(QSqlError("PostgresResult", MSG, ERR_TYPE, "1")); \
-    alog::logger().error(__FILE__, __func__, __LINE__, "PostgresDrv") << MSG; \
+    alog::logger().error(alog_line_location, "PostgresDrv") << MSG; \
 }
 
 #define PGR(CMD) PGresultPtr{CMD}
@@ -618,7 +618,8 @@ bool Result::checkError(const char* msg, QSqlError::ErrorType type,
     {
         const char* err = PQerrorMessage(_drv->_connect);
         setLastError(QSqlError("PostgresResult", msg, type, "1"));
-        alog::logger().error(__FILE__, func, line, "PostgresDrv") << msg
+        alog::logger().error(alog::detail::file_name(__FILE__), func, line, "PostgresDrv")
+            << msg
             << ". Transact: " << addrToNumber(_drv->_connect) << "/" << transactId()
             << ". Detail: "   << err;
         return true;

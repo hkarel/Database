@@ -55,12 +55,12 @@
 #include <cstdlib>
 #include <utility>
 
-#define log_error_m   alog::logger().error  (__FILE__, __func__, __LINE__, "FirebirdDrv")
-#define log_warn_m    alog::logger().warn   (__FILE__, __func__, __LINE__, "FirebirdDrv")
-#define log_info_m    alog::logger().info   (__FILE__, __func__, __LINE__, "FirebirdDrv")
-#define log_verbose_m alog::logger().verbose(__FILE__, __func__, __LINE__, "FirebirdDrv")
-#define log_debug_m   alog::logger().debug  (__FILE__, __func__, __LINE__, "FirebirdDrv")
-#define log_debug2_m  alog::logger().debug2 (__FILE__, __func__, __LINE__, "FirebirdDrv")
+#define log_error_m   alog::logger().error   (alog_line_location, "FirebirdDrv")
+#define log_warn_m    alog::logger().warn    (alog_line_location, "FirebirdDrv")
+#define log_info_m    alog::logger().info    (alog_line_location, "FirebirdDrv")
+#define log_verbose_m alog::logger().verbose (alog_line_location, "FirebirdDrv")
+#define log_debug_m   alog::logger().debug   (alog_line_location, "FirebirdDrv")
+#define log_debug2_m  alog::logger().debug2  (alog_line_location, "FirebirdDrv")
 
 #define FBVERSION SQL_DIALECT_V6
 
@@ -823,7 +823,7 @@ AutoRollbackTransact::~AutoRollbackTransact()
 
 #define SET_LAST_ERROR(MSG, ERR_TYPE) { \
     setLastError(QSqlError("FirebirdResult", MSG, ERR_TYPE, 1)); \
-    alog::logger().error(__FILE__, __func__, __LINE__, "FirebirdDrv") << MSG; \
+    alog::logger().error(alog_line_location, "FirebirdDrv") << MSG; \
 }
 
 Result::Result(const DriverPtr& drv, ForwardOnly forwardOnly)
@@ -869,7 +869,8 @@ bool Result::checkError(const char* msg, QSqlError::ErrorType type,
     if (firebirdError(status, _drv->_textCodec, sqlcode, err))
     {
         setLastError(QSqlError("FirebirdResult", msg, type, 1));
-        alog::logger().error(__FILE__, func, line, "FirebirdDrv") << msg
+        alog::logger().error(alog::detail::file_name(__FILE__), func, line, "FirebirdDrv")
+            << msg
             << ". Transact: " << _drv->_ibase << "/" << *transact()
             << ". Detail: "   << err
             << ". SqlCode: "  << sqlcode;
@@ -2724,8 +2725,8 @@ bool Driver::checkError(const char* msg, QSqlError::ErrorType type,
     if (firebirdError(status, _textCodec, sqlcode, err))
     {
         setLastError(QSqlError("FirebirdDriver", msg, type, 1));
-        alog::logger().error(__FILE__, func, line, "FirebirdDrv")
-            << msg << "; Detail: " << err << "; SqlCode: " << sqlcode;
+        alog::logger().error(alog::detail::file_name(__FILE__), func, line, "FirebirdDrv")
+            << msg << ". Detail: " << err << "; SqlCode: " << sqlcode;
         return true;
     }
     return false;
