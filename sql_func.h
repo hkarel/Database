@@ -73,7 +73,6 @@ QVariant bindVariant(quint32);
 QVariant bindVariant(qint64);
 QVariant bindVariant(quint64);
 QVariant bindVariant(const char*);
-//QVariant bindVariant(const QVector<qint32>&);
 
 inline QVariant bindVariant(const QVariant& val) {return val;}
 
