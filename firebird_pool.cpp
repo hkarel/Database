@@ -31,7 +31,7 @@ namespace firebird {
 
 Pool& pool()
 {
-    return ::safe_singleton<Pool>();
+    return ::safe_singleton<Pool, 0>();
 }
 
 } // namespace firebird
