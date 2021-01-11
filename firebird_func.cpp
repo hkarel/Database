@@ -35,7 +35,7 @@
 namespace db {
 namespace firebird {
 
-bool databaseAsyncCheck(const YamlConfig& conf)
+bool asyncCheck(const YamlConfig& conf)
 {
     QString databaseFile;
     int databaseAsyncDetect = -1;
