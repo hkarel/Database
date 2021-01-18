@@ -104,7 +104,7 @@ bool ConnectPool<DatabaseT>::init(InitFunc initFunc, int timeout)
 template<typename DatabaseT>
 void ConnectPool<DatabaseT>::close()
 {
-    QMutexLocker locker(&_poolLock); (void) locker;
+    QMutexLocker locker {&_poolLock}; (void) locker;
 
     log_verbose_m << "Close database pool connection"
                   << ". Pool size: " << _connectList.count();
@@ -118,7 +118,7 @@ void ConnectPool<DatabaseT>::close()
 template<typename DatabaseT>
 void ConnectPool<DatabaseT>::abortOperations()
 {
-    QMutexLocker locker(&_poolLock); (void) locker;
+    QMutexLocker locker {&_poolLock}; (void) locker;
 
     log_verbose_m << "Abort database operations";
 
@@ -129,7 +129,7 @@ void ConnectPool<DatabaseT>::abortOperations()
 template<typename DatabaseT>
 void ConnectPool<DatabaseT>::abortOperation(pid_t threadId)
 {
-    QMutexLocker locker(&_poolLock); (void) locker;
+    QMutexLocker locker {&_poolLock}; (void) locker;
 
     for (typename Data::Ptr& d : _connectList)
         if (d->threadId == threadId)
@@ -142,7 +142,7 @@ void ConnectPool<DatabaseT>::abortOperation(pid_t threadId)
 template<typename DatabaseT>
 typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect(int timeout)
 {
-    QMutexLocker locker(&_poolLock); (void) locker;
+    QMutexLocker locker {&_poolLock}; (void) locker;
 
     // Проверяем коннекты для которых операция была прервана, их удаляем
     for (int i = 0; i < _connectList.count(); ++i)
