@@ -585,7 +585,8 @@ bool Transaction::isActive() const
 
 Result::Result(const DriverPtr& drv, ForwardOnly forwardOnly)
     : SqlCachedResult(drv.get()),
-      _drv(drv)
+      _drv(drv),
+      _internalTransact(drv->_transactAddr)
 {
     Q_ASSERT(_drv.get());
     setForwardOnly(forwardOnly == ForwardOnly::Yes);
