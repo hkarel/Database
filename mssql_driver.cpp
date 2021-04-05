@@ -940,29 +940,30 @@ bool Result::exec()
     SQLRETURN r;
     for (i = 0; i < values.count(); ++i)
     {
+        SQLSMALLINT i, dataType, decimalDigits, nullable;
+        SQLULEN bytesRemaining;
+
+        r = SQLDescribeParam(hStmt,i+1, &dataType,&bytesRemaining,&decimalDigits,&nullable);
+
+        if (r != SQL_SUCCESS)
+        {
+            log_warn_m << "QODBCResult::exec: unable to bind variable:" << qODBCWarn(hStmt);
+            setLastError(detail::qMakeError(QCoreApplication::translate("QODBCResult",
+                         "Unable to bind variable"), QSqlError::StatementError, _drv));
+            return false;
+        }
+
         if (bindValueType(i) & QSql::Out)
             values[i].detach();
         const QVariant &val = values.at(i);
         SQLLEN *ind = &indicators[i];
         if (val.isNull())
             *ind = SQL_NULL_DATA;
-        //QVariant a = val.userType();
 
-//        if (val.userType() == qMetaTypeId<QUuidEx>())
-//        {
-//            val.setValue
-//            const QUuidEx& uuid = val.value<QUuidEx>();
-//            v = uuid.toRfc4122();
-//        }
-//        else if (val.userType() == qMetaTypeId<QUuid>())
-//        {
-//            const QUuid& uuid = val.value<QUuid>();
-//            v = uuid.toRfc4122();
-//        }
-
-        switch (val.userType())
+        switch(dataType)
         {
-            case QVariant::Date:
+            case SQL_DATE:
+            case SQL_TYPE_DATE:
             {
                 QByteArray &ba = tmpStorage[i];
                 ba.resize(sizeof(DATE_STRUCT));
@@ -980,7 +981,8 @@ bool Result::exec()
                                      (void *) dt, 0, *ind == SQL_NULL_DATA ? ind : NULL);
                 break;
             }
-            case QVariant::Time:
+            case SQL_TIME:
+            case SQL_TYPE_TIME:
             {
                 QByteArray &ba = tmpStorage[i];
                 ba.resize(sizeof(TIME_STRUCT));
@@ -992,7 +994,8 @@ bool Result::exec()
                 r = SQLBindParameter(hStmt, i + 1, qParamType[bindValueType(i) & QSql::InOut], SQL_C_TIME, SQL_TIME, 0, 0, (void *) dt, 0, *ind == SQL_NULL_DATA ? ind : NULL);
                 break;
             }
-            case QVariant::DateTime:
+            case SQL_TIMESTAMP:
+            case SQL_TYPE_TIMESTAMP:
             {
                 QByteArray &ba = tmpStorage[i];
                 ba.resize(sizeof(TIMESTAMP_STRUCT));
@@ -1030,7 +1033,8 @@ bool Result::exec()
                                      0,
                                      *ind == SQL_NULL_DATA ? ind : NULL);
                 break; }
-            case QVariant::Int:
+            case SQL_SMALLINT:
+            case SQL_INTEGER:
                 r = SQLBindParameter(hStmt,
                                      i + 1,
                                      qParamType[bindValueType(i) & QSql::InOut],
@@ -1042,7 +1046,7 @@ bool Result::exec()
                                      0,
                                      *ind == SQL_NULL_DATA ? ind : NULL);
                 break;
-            case QVariant::UInt:
+            case SQL_TINYINT:
                 r = SQLBindParameter(hStmt,
                                       i + 1,
                                       qParamType[bindValueType(i) & QSql::InOut],
@@ -1054,7 +1058,11 @@ bool Result::exec()
                                       0,
                                       *ind == SQL_NULL_DATA ? ind : NULL);
                 break;
-            case QVariant::Double:
+            case SQL_DECIMAL:
+            case SQL_NUMERIC:
+            case SQL_REAL:
+            case SQL_FLOAT:
+            case SQL_DOUBLE:
                 r = SQLBindParameter(hStmt,
                                       i + 1,
                                       qParamType[bindValueType(i) & QSql::InOut],
@@ -1066,19 +1074,7 @@ bool Result::exec()
                                       0,
                                       *ind == SQL_NULL_DATA ? ind : NULL);
                 break;
-            case QVariant::LongLong:
-                r = SQLBindParameter(hStmt,
-                                      i + 1,
-                                      qParamType[bindValueType(i) & QSql::InOut],
-                                      SQL_C_SBIGINT,
-                                      SQL_BIGINT,
-                                      0,
-                                      0,
-                                      const_cast<void *>(val.constData()),
-                                      0,
-                                      *ind == SQL_NULL_DATA ? ind : NULL);
-                break;
-            case QVariant::ULongLong:
+            case SQL_BIGINT:
                 r = SQLBindParameter(hStmt,
                                       i + 1,
                                       qParamType[bindValueType(i) & QSql::InOut],
@@ -1090,7 +1086,9 @@ bool Result::exec()
                                       0,
                                       *ind == SQL_NULL_DATA ? ind : NULL);
                 break;
-            case QVariant::ByteArray:
+            case SQL_BINARY:
+            case SQL_VARBINARY:
+            case SQL_LONGVARBINARY:
             {
                 if (*ind != SQL_NULL_DATA)
                 {
@@ -1111,7 +1109,7 @@ bool Result::exec()
             //case 1755: /* QVariant::Type(qMetaTypeId<QUuidEx>()) */
             //case QVariant::Type(qMetaTypeId<QUuidEx>()): /* QVariant::Type(qMetaTypeId<QUuidEx>()) */
             //case qMetaTypeId<QUuidEx>().id:
-            case QVariant::Uuid:
+            case SQL_GUID:
             {
                 //constexpr int test_enum = qMetaTypeId<QUuidEx>();
 
@@ -1155,7 +1153,7 @@ bool Result::exec()
                 r = SQLBindParameter(hStmt, i + 1, qParamType[bindValueType(i) & QSql::InOut], SQL_C_GUID, SQL_GUID, ba.size(), 0, const_cast<char *>(ba.constData()), ba.size(), ind);
                 break;
             }
-            case QVariant::Bool:
+            case SQL_BIT:
                 r = SQLBindParameter(hStmt,
                                       i + 1,
                                       qParamType[bindValueType(i) & QSql::InOut],
@@ -1167,7 +1165,12 @@ bool Result::exec()
                                       0,
                                       *ind == SQL_NULL_DATA ? ind : NULL);
                 break;
-            case QVariant::String:
+            case SQL_WCHAR:
+            case SQL_WVARCHAR:
+            case SQL_WLONGVARCHAR:
+            case SQL_CHAR:
+            case SQL_VARCHAR:
+            case SQL_LONGVARCHAR:
                 if (_drv->unicode)
                 {
                     QByteArray &ba = tmpStorage[i];
