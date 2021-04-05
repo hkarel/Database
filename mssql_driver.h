@@ -138,6 +138,9 @@ public:
     bool prepare(const QString& query) override; //+
     bool exec() override; //+
 
+//public slots:
+//    void cancelQueryResult();
+
 protected:
 
     /**
@@ -176,6 +179,8 @@ private:
     quint64 transactId() const;
 
 private:
+//    Q_OBJECT
+
     DISABLE_DEFAULT_COPY(Result)
 
     DriverPtr        _drv;
@@ -201,6 +206,8 @@ private:
 
 class Driver final : public QSqlDriver, public clife_base
 {
+//signals:
+//    void cancelQueryDriver();
 public:
     typedef DriverPtr Ptr;
     ~Driver();

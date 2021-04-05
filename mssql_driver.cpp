@@ -186,7 +186,7 @@ QString qODBCWarn(const SQLHANDLE hStmt, const SQLHANDLE envHandle = 0, const SQ
 
 QString qODBCWarn(const Result* odbc, int *nativeCode)
 {
-    return qODBCWarn(0, odbc->_drv->hEnv, odbc->_drv->hDbc, nativeCode);
+    return qODBCWarn(odbc->hStmt, odbc->_drv->hEnv, odbc->_drv->hDbc, nativeCode);
 }
 
 void qSqlWarning(const QString& message, const Result* odbc)
@@ -194,7 +194,7 @@ void qSqlWarning(const QString& message, const Result* odbc)
     log_warn_m << message << "\tError:" << qODBCWarn((SQLHANDLE)odbc, 0);
 }
 
-void qSqlWarning(const QString &message, const SQLHANDLE hStmt)
+void qSqlWarning(const QString& message, const SQLHANDLE hStmt)
 {
     log_warn_m << message << "\tError:" << qODBCWarn(hStmt);
 }
@@ -1346,6 +1346,21 @@ bool Result::exec()
     return true;
 }
 
+//void Result::cancelQueryResult()
+//{
+//    if (SQLCancel(hStmt))
+//    {
+//        const int errBuffSize = 256;
+//        char errBuff[errBuffSize] = {0};
+//        {
+//            const char* msg = "Failed abort sql-operation";
+//            setLastError(QSqlError("PostgresDriver", msg, QSqlError::UnknownError, "1"));
+
+//            log_error_m << msg << "; Detail: " << errBuff;
+//        }
+//    }
+//}
+
 bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
 {
     using namespace  detail;
@@ -1689,11 +1704,36 @@ void Driver::close()
     if (!isOpen())
         return;
 
-    if (hDbc)
-        SQLDisconnect(hDbc);
+    SQLRETURN r;
+
+//    if (hDbc)
+//        SQLDisconnect(hDbc);
+
+    if(hDbc)
+    {
+        // Open statements/descriptors handles are automatically cleaned up by SQLDisconnect
+        if (isOpen())
+        {
+            r = SQLDisconnect(hDbc);
+            if (r != SQL_SUCCESS)
+                detail::qSqlWarning(QLatin1String("QODBCDriver::disconnect: Unable to disconnect datasource"), this);
+        }
+
+        r = SQLFreeHandle(SQL_HANDLE_DBC, hDbc);
+        if (r != SQL_SUCCESS)
+            detail::qSqlWarning(QLatin1String("QODBCDriver::cleanup: Unable to free connection handle"), this);
+        hDbc = nullptr;
+    }
+
+    if (hEnv)
+    {
+        r = SQLFreeHandle(SQL_HANDLE_ENV, hEnv);
+        if (r != SQL_SUCCESS)
+            detail::qSqlWarning(QLatin1String("QODBCDriver::cleanup: Unable to free environment handle"), this);
+        hEnv = 0;
+    }
 
 
-    hDbc = 0;
     _threadId = 0;
     _transactAddr = 0;
 
@@ -1839,17 +1879,20 @@ void Driver::abortOperation(/*const SQLHANDLE hStmt*/)
 
     _operationIsAborted = true;
 
-    //if (SQLCancel(hStmt)) // SQLDisconnect
-    {
-        const int errBuffSize = 256;
-        char errBuff[errBuffSize] = {0};
-        {
-            const char* msg = "Failed abort sql-operation";
-            setLastError(QSqlError("PostgresDriver", msg, QSqlError::UnknownError, "1"));
+    SQLFreeHandle(SQL_HANDLE_DBC, hDbc);
+    SQLFreeHandle(SQL_HANDLE_ENV, hEnv);
 
-            log_error_m << msg << "; Detail: " << errBuff;
-        }
-    }
+    //if (SQLCancel(hStmt)) // SQLDisconnect
+//    {
+//        const int errBuffSize = 256;
+//        char errBuff[errBuffSize] = {0};
+//        {
+//            const char* msg = "Failed abort sql-operation";
+//            setLastError(QSqlError("PostgresDriver", msg, QSqlError::UnknownError, "1"));
+
+//            log_error_m << msg << "; Detail: " << errBuff;
+//        }
+//    }
 }
 
 bool Driver::operationIsAborted() const
