@@ -255,6 +255,7 @@ public:
 
     // Возвращает TRUE если sql-операция была прервана
     bool operationIsAborted() const;
+    bool setConnectionOptions(const QString& connOpts);
 
     SQLHANDLE hEnv = nullptr;
     SQLHANDLE hDbc = nullptr;
