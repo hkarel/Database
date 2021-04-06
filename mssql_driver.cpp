@@ -194,6 +194,11 @@ void qSqlWarning(const QString& message, const Result* odbc)
     log_warn_m << message << "\tError:" << qODBCWarn((SQLHANDLE)odbc, 0);
 }
 
+void qSqlWarning(const QString& message, const Driver* odbc)
+{
+    log_warn_m << message << "\tError:" << qODBCWarn((SQLHANDLE)odbc, 0);
+}
+
 void qSqlWarning(const QString& message, const SQLHANDLE hStmt)
 {
     log_warn_m << message << "\tError:" << qODBCWarn(hStmt);
@@ -884,6 +889,8 @@ bool Result::prepare(const QString& query)
         return false;
     }
 
+    _drv->addStmt(hStmt);
+
     updateStmtHandleState();
 
     if (isForwardOnly())
@@ -1501,6 +1508,8 @@ bool Result::reset(const QString& query)
         return false;
     }
 
+    _drv->addStmt(hStmt);
+
     updateStmtHandleState();
 
     if (isForwardOnly())
@@ -1761,6 +1770,7 @@ Transaction::Ptr Driver::createTransact() const
 QSqlResult* Driver::createResult() const
 {
     return new Result(Driver::Ptr((Driver*)this), Result::ForwardOnly::Yes);
+    //_resultsList.append(new Result(Driver::Ptr((Driver*)this), Result::ForwardOnly::Yes));
     return 0;
 }
 
@@ -1879,20 +1889,56 @@ void Driver::abortOperation(/*const SQLHANDLE hStmt*/)
 
     _operationIsAborted = true;
 
-    SQLFreeHandle(SQL_HANDLE_DBC, hDbc);
-    SQLFreeHandle(SQL_HANDLE_ENV, hEnv);
+    for (SQLHANDLE hStmt : _resultsList)
+    {
+        if (hStmt)
+        {
+            if (SQLCancel(hStmt))
+            {
+                const int errBuffSize = 256;
+                char errBuff[errBuffSize] = {0};
+                {
+                    const char* msg = "Failed abort sql-operation";
+                    setLastError(QSqlError("MSSQL Driver", msg, QSqlError::UnknownError, " Unable to cancel statement"));
 
-    //if (SQLCancel(hStmt)) // SQLDisconnect
-//    {
-//        const int errBuffSize = 256;
-//        char errBuff[errBuffSize] = {0};
-//        {
-//            const char* msg = "Failed abort sql-operation";
-//            setLastError(QSqlError("PostgresDriver", msg, QSqlError::UnknownError, "1"));
+                    log_error_m << msg << "; Detail: " << errBuff;
+                }
+            }
 
-//            log_error_m << msg << "; Detail: " << errBuff;
-//        }
-//    }
+            if (SQLFreeHandle(SQL_HANDLE_STMT, hStmt))
+            {
+                detail::qSqlWarning(QLatin1String("Driver::abortOperation: Unable to free statement"), hStmt);
+            }
+        }
+    }
+
+//    SQLFreeHandle(SQL_HANDLE_DBC, hDbc);
+//    SQLFreeHandle(SQL_HANDLE_ENV, hEnv);
+
+}
+
+void Driver::addStmt(SQLHANDLE hStmt)
+{
+    QMutexLocker locker {&_stmtMutex}; (void) locker;
+
+    if (!_resultsList.contains(hStmt))
+        _resultsList.append(hStmt);
+}
+
+void Driver::delStmt(SQLHANDLE hStmt)
+{
+    QMutexLocker locker {&_stmtMutex}; (void) locker;
+
+    int i = 0;
+    if (_resultsList.contains(hStmt))
+        for (SQLHANDLE sqlHandle : _resultsList)
+        {
+            if (sqlHandle == hStmt)
+                break;
+
+            ++i;
+        }
+    _resultsList.removeAt(i);
 }
 
 bool Driver::operationIsAborted() const

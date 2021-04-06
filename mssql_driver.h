@@ -135,8 +135,8 @@ public:
     Result(const Transaction::Ptr&, ForwardOnly);
     ~Result();
 
-    bool prepare(const QString& query) override; //+
-    bool exec() override; //+
+    bool prepare(const QString& query) override;
+    bool exec() override;
 
 //public slots:
 //    void cancelQueryResult();
@@ -158,11 +158,11 @@ protected:
     }
 
 protected:
-    bool gotoNext(SqlCachedResult::ValueCache& row, int rowIdx) override; //+
-    bool reset(const QString& query) override; //+
-    int  size() override; //+
-    int  numRowsAffected() override; //+
-    QSqlRecord record() const override; //+
+    bool gotoNext(SqlCachedResult::ValueCache& row, int rowIdx) override;
+    bool reset(const QString& query) override;
+    int  size() override;
+    int  numRowsAffected() override;
+    QSqlRecord record() const override;
 
     void clearValues();
 
@@ -250,6 +250,9 @@ public:
     // его можно будет только закрыть.
     void abortOperation(/*const SQLHANDLE hStmt*/);
 
+    void addStmt(SQLHANDLE);
+    void delStmt(SQLHANDLE);
+
     // Возвращает TRUE если sql-операция была прервана
     bool operationIsAborted() const;
 
@@ -294,11 +297,14 @@ private:
     bool hasSQLFetchScroll = true;
     bool hasMultiResultSets = false;
 
+    QList<SQLHANDLE> _resultsList;
+
     friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
     friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, const DriverPtr& p);
     friend QSqlField detail::qMakeFieldInfo(const Result* p, int i );
     friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
 
+    QMutex _stmtMutex;
 };
 
 Transaction::Ptr createTransact(const DriverPtr&);
