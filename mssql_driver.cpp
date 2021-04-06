@@ -256,10 +256,10 @@ QVariant::Type qDecodeODBCType(SQLSMALLINT sqltype, bool isSigned = true)
         case SQL_WCHAR:
         case SQL_WVARCHAR:
         case SQL_WLONGVARCHAR:
-            type = QVariant::String;
-            break;
         case SQL_CHAR:
         case SQL_VARCHAR:
+            type = QVariant::String;
+            break;
     #if (ODBCVER >= 0x0350)
         case SQL_GUID:
             type = QVariant::Type(qMetaTypeId<QUuidEx>());
@@ -728,6 +728,9 @@ Result::Result(const DriverPtr& drv, ForwardOnly forwardOnly)
 {
     Q_ASSERT(_drv.get());
     setForwardOnly(forwardOnly == ForwardOnly::Yes);
+
+    chk_connect_d(_drv.get(), SIGNAL(abortStatement()), this, SLOT(abortStatement()));
+
 }
 
 Result::Result(const Transaction::Ptr& trans, ForwardOnly forwardOnly)
@@ -737,6 +740,8 @@ Result::Result(const Transaction::Ptr& trans, ForwardOnly forwardOnly)
 {
     Q_ASSERT(_drv.get());
     setForwardOnly(forwardOnly == ForwardOnly::Yes);
+
+    chk_connect_d(_drv.get(), SIGNAL(abortStatement()), this, SLOT(abortStatement()));
 }
 
 Result::~Result()
@@ -889,7 +894,7 @@ bool Result::prepare(const QString& query)
         return false;
     }
 
-    _drv->addStmt(hStmt);
+//    _drv->addStmt(hStmt);
 
     updateStmtHandleState();
 
@@ -947,10 +952,10 @@ bool Result::exec()
     SQLRETURN r;
     for (i = 0; i < values.count(); ++i)
     {
-        SQLSMALLINT i, dataType, decimalDigits, nullable;
+        SQLSMALLINT dataType, decimalDigits, nullable;
         SQLULEN bytesRemaining;
 
-        r = SQLDescribeParam(hStmt,i+1, &dataType,&bytesRemaining,&decimalDigits,&nullable);
+        r = SQLDescribeParam(hStmt, i + 1, &dataType, &bytesRemaining, &decimalDigits, &nullable);
 
         if (r != SQL_SUCCESS)
         {
@@ -1113,9 +1118,6 @@ bool Result::exec()
                                       ind);
                 break;
             }
-            //case 1755: /* QVariant::Type(qMetaTypeId<QUuidEx>()) */
-            //case QVariant::Type(qMetaTypeId<QUuidEx>()): /* QVariant::Type(qMetaTypeId<QUuidEx>()) */
-            //case qMetaTypeId<QUuidEx>().id:
             case SQL_GUID:
             {
                 //constexpr int test_enum = qMetaTypeId<QUuidEx>();
@@ -1353,20 +1355,20 @@ bool Result::exec()
     return true;
 }
 
-//void Result::cancelQueryResult()
-//{
-//    if (SQLCancel(hStmt))
-//    {
-//        const int errBuffSize = 256;
-//        char errBuff[errBuffSize] = {0};
-//        {
-//            const char* msg = "Failed abort sql-operation";
-//            setLastError(QSqlError("PostgresDriver", msg, QSqlError::UnknownError, "1"));
+void Result::abortStatement()
+{
+    if (SQLCancel(hStmt))
+    {
+        const int errBuffSize = 256;
+        char errBuff[errBuffSize] = {0};
+        {
+            const char* msg = "Failed abort sql-operation";
+            setLastError(QSqlError("MSSQL Driver", msg, QSqlError::UnknownError, "Unable abort statement"));
 
-//            log_error_m << msg << "; Detail: " << errBuff;
-//        }
-//    }
-//}
+            log_error_m << msg << "; Detail: " << errBuff;
+        }
+    }
+}
 
 bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
 {
@@ -1508,7 +1510,7 @@ bool Result::reset(const QString& query)
         return false;
     }
 
-    _drv->addStmt(hStmt);
+//    _drv->addStmt(hStmt);
 
     updateStmtHandleState();
 
@@ -2033,57 +2035,62 @@ void Driver::abortOperation(/*const SQLHANDLE hStmt*/)
 
     _operationIsAborted = true;
 
-    for (SQLHANDLE hStmt : _resultsList)
-    {
-        if (hStmt)
-        {
-            if (SQLCancel(hStmt))
-            {
-                const int errBuffSize = 256;
-                char errBuff[errBuffSize] = {0};
-                {
-                    const char* msg = "Failed abort sql-operation";
-                    setLastError(QSqlError("MSSQL Driver", msg, QSqlError::UnknownError, " Unable to cancel statement"));
+    // Отладить
+    break_point
 
-                    log_error_m << msg << "; Detail: " << errBuff;
-                }
-            }
+    emit abortStatement();
 
-            if (SQLFreeHandle(SQL_HANDLE_STMT, hStmt))
-            {
-                detail::qSqlWarning(QLatin1String("Driver::abortOperation: Unable to free statement"), hStmt);
-            }
-        }
-    }
+//    for (SQLHANDLE hStmt : _resultsList)
+//    {
+//        if (hStmt)
+//        {
+//            if (SQLCancel(hStmt))
+//            {
+//                const int errBuffSize = 256;
+//                char errBuff[errBuffSize] = {0};
+//                {
+//                    const char* msg = "Failed abort sql-operation";
+//                    setLastError(QSqlError("MSSQL Driver", msg, QSqlError::UnknownError, " Unable to cancel statement"));
+
+//                    log_error_m << msg << "; Detail: " << errBuff;
+//                }
+//            }
+
+//            if (SQLFreeHandle(SQL_HANDLE_STMT, hStmt))
+//            {
+//                detail::qSqlWarning(QLatin1String("Driver::abortOperation: Unable to free statement"), hStmt);
+//            }
+//        }
+//    }
 
 //    SQLFreeHandle(SQL_HANDLE_DBC, hDbc);
 //    SQLFreeHandle(SQL_HANDLE_ENV, hEnv);
 
 }
 
-void Driver::addStmt(SQLHANDLE hStmt)
-{
-    QMutexLocker locker {&_stmtMutex}; (void) locker;
+//void Driver::addStmt(SQLHANDLE hStmt)
+//{
+//    QMutexLocker locker {&_stmtMutex}; (void) locker;
 
-    if (!_resultsList.contains(hStmt))
-        _resultsList.append(hStmt);
-}
+//    if (!_resultsList.contains(hStmt))
+//        _resultsList.append(hStmt);
+//}
 
-void Driver::delStmt(SQLHANDLE hStmt)
-{
-    QMutexLocker locker {&_stmtMutex}; (void) locker;
+//void Driver::delStmt(SQLHANDLE hStmt)
+//{
+//    QMutexLocker locker {&_stmtMutex}; (void) locker;
 
-    int i = 0;
-    if (_resultsList.contains(hStmt))
-        for (SQLHANDLE sqlHandle : _resultsList)
-        {
-            if (sqlHandle == hStmt)
-                break;
+//    int i = 0;
+//    if (_resultsList.contains(hStmt))
+//        for (SQLHANDLE sqlHandle : _resultsList)
+//        {
+//            if (sqlHandle == hStmt)
+//                break;
 
-            ++i;
-        }
-    _resultsList.removeAt(i);
-}
+//            ++i;
+//        }
+//    _resultsList.removeAt(i);
+//}
 
 bool Driver::operationIsAborted() const
 {

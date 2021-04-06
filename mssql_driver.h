@@ -126,7 +126,7 @@ private:
     friend Transaction::Ptr createTransact(const DriverPtr&);
 };
 
-class Result final : public SqlCachedResult /*QSqlResult*/
+class Result final : public QObject, public SqlCachedResult /*QSqlResult*/
 {
 public:
     enum class ForwardOnly {No = 0, Yes = 1};
@@ -138,8 +138,8 @@ public:
     bool prepare(const QString& query) override;
     bool exec() override;
 
-//public slots:
-//    void cancelQueryResult();
+public slots:
+    void abortStatement();
 
 protected:
 
@@ -179,7 +179,7 @@ private:
     quint64 transactId() const;
 
 private:
-//    Q_OBJECT
+    Q_OBJECT
 
     DISABLE_DEFAULT_COPY(Result)
 
@@ -206,8 +206,8 @@ private:
 
 class Driver final : public QSqlDriver, public clife_base
 {
-//signals:
-//    void cancelQueryDriver();
+signals:
+    void abortStatement();
 public:
     typedef DriverPtr Ptr;
     ~Driver();
@@ -250,8 +250,8 @@ public:
     // его можно будет только закрыть.
     void abortOperation(/*const SQLHANDLE hStmt*/);
 
-    void addStmt(SQLHANDLE);
-    void delStmt(SQLHANDLE);
+//    void addStmt(SQLHANDLE);
+//    void delStmt(SQLHANDLE);
 
     // Возвращает TRUE если sql-операция была прервана
     bool operationIsAborted() const;
@@ -292,20 +292,20 @@ private:
 
     int disconnectCount = 0;
     const int datetimePrecision = 19;
-    bool unicode = false;
+    bool unicode = true;
     bool useSchema = false;
     bool isFreeTDSDriver = false;
     bool hasSQLFetchScroll = true;
     bool hasMultiResultSets = false;
 
-    QList<SQLHANDLE> _resultsList;
+    //QList<SQLHANDLE> _resultsList;
 
     friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
     friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, const DriverPtr& p);
     friend QSqlField detail::qMakeFieldInfo(const Result* p, int i );
     friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
 
-    QMutex _stmtMutex;
+    //QMutex _stmtMutex;
 };
 
 Transaction::Ptr createTransact(const DriverPtr&);
