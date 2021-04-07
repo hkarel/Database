@@ -276,9 +276,9 @@ private:
     Driver();
     DISABLE_DEFAULT_COPY(Driver)
 
-    PGconn*          _connect = {0};
-    pid_t            _threadId = {0};
-    Transaction*     _transactAddr = {0};
+    PGconn* _connect = {0};
+    pid_t   _threadId = {0};
+    quint64 _transactNumber = {0};
     std::atomic_bool _operationIsAborted = {false};
 
     friend class Result;

@@ -1865,7 +1865,7 @@ void Driver::close()
 
     _connect = 0;
     _threadId = 0;
-    _transactAddr = 0;
+    _transactNumber = 0;
 
     setOpen(false);
     setOpenError(false);
@@ -1948,35 +1948,35 @@ bool Driver::rollbackTransaction()
 
 void Driver::captureTransactAddr(Transaction* transact)
 {
-    if (_transactAddr == 0)
+    if (_transactNumber == 0)
     {
-        _transactAddr = transact;
+        _transactNumber = addrToNumber(transact);
         log_debug2_m << "Transaction address captured: " << addrToNumber(transact)
                      << ". Connect: " << addrToNumber(_connect);
     }
     else
         log_warn_m << "Failed capture transaction address: "  << addrToNumber(transact)
-                   << ". Already captured: " << addrToNumber(_transactAddr)
+                   << ". Already captured: " << _transactNumber
                    << ". Connect: " << addrToNumber(_connect);
 }
 
 void Driver::releaseTransactAddr(Transaction* transact)
 {
-    if (_transactAddr == transact)
+    if (_transactNumber == addrToNumber(transact))
     {
-        _transactAddr = 0;
+        _transactNumber = 0;
         log_debug2_m << "Transaction address released: " << addrToNumber(transact)
                      << ". Connect: " << addrToNumber(_connect);
     }
     else
         log_warn_m << "Failed release transaction address: "  << addrToNumber(transact)
-                   << ". Already captured: " << addrToNumber(_transactAddr)
+                   << ". Already captured: " << _transactNumber
                    << ". Connect: " << addrToNumber(_connect);
 }
 
 bool Driver::transactAddrIsEqual(Transaction* transact)
 {
-    return (_transactAddr == transact);
+    return (_transactNumber == addrToNumber(transact));
 }
 
 //QStringList Driver::tables(QSql::TableType type) const
