@@ -1987,7 +1987,7 @@ bool Driver::transactAddrIsEqual(Transaction* transact)
 //{
 //}
 
-//QSqlIndex Driver::primaryIndex(const QString& table) const
+//QSqlIndex Driver::primaryIndex(const QString& tableName) const
 //{
 //}
 

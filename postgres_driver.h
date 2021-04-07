@@ -159,14 +159,6 @@ protected:
     int  numRowsAffected() override;
     QSqlRecord record() const override;
 
-//    QVariant data(int i) override;
-//    bool isNull(int i) override;
-//    bool fetch(int i) override;
-//    bool fetchNext() override;
-//    bool fetchPrevious() override;
-//    bool fetchFirst() override;
-//    bool fetchLast() override;
-
 private:
     // Возвращает TRUE если sql-выражение  является  SELECT-запросом  или если
     // в sql-выражении вызывается хранимая процедура возвращающая набор данных.
@@ -190,7 +182,6 @@ private:
     QByteArray       _stmtName;
     PGresultPtr      _stmt;
     QString          _preparedQuery; // Содержит подготовленный запрос
-
 };
 
 class Driver final : public QSqlDriver, public clife_base
@@ -225,12 +216,11 @@ public:
     QSqlResult* createResult() const override;
     QSqlResult* createResult(const Transaction::Ptr&) const;
 
-//    QVariant handle() const override;
     bool hasFeature(DriverFeature f) const override;
 
 //    QStringList tables(QSql::TableType) const override;
 //    QSqlRecord  record(const QString& tableName) const override;
-//    QSqlIndex   primaryIndex(const QString &table) const override;
+//    QSqlIndex   primaryIndex(const QString& tableName) const override;
 
     QString formatValue(const QSqlField& field, bool trimStrings) const override;
     QString escapeIdentifier(const QString& identifier, IdentifierType type) const override;
