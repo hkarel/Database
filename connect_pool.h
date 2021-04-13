@@ -25,7 +25,6 @@
 
 #pragma once
 
-//#include "firebird_driver.h"
 #include "shared/defmac.h"
 #include "shared/container_ptr.h"
 #include "shared/logger/logger.h"
@@ -57,13 +56,19 @@ public:
 
     ConnectPool() = default;
 
-    // Таймаут задается в секундах
-    bool init(InitFunc, int timeout = 10*60 /*10 мин*/);
+    // Параметр defaultTimeout задает время по умолчанию  (в секундах)
+    // по истечении которого соединение с БД будет закрыто при условии
+    // бездействия этого соединения
+    bool init(InitFunc, int defaultTimeout = 10*60 /*10 мин*/);
     void close();
 
     void abortOperations();
     void abortOperation(pid_t threadId);
 
+    // Параметр timeout задает время (в секундах)  по истечении  которого
+    // соединение с  БД  будет  закрыто  при  условии  бездействия  этого
+    // соединения. Если timeout меньше или равно 0, то в качестве таймаута
+    // будет использоваться defaultTimeout
     typename DatabaseT::Ptr connect(int timeout = 0);
 
 private:
@@ -83,19 +88,16 @@ private:
     QList<typename Data::Ptr> _connectList;
     InitFunc _initFunc;
     QMutex _poolLock;
-
-    // Таймаут по умолчанию (задается в секундах)
     int _defaultTimeout;
 
     template<typename T, int> friend T& ::safe_singleton();
 };
 
 template<typename DatabaseT>
-bool ConnectPool<DatabaseT>::init(InitFunc initFunc, int timeout)
+bool ConnectPool<DatabaseT>::init(InitFunc initFunc, int defaultTimeout)
 {
     _initFunc = initFunc;
-    _defaultTimeout = timeout;
-    //return true;
+    _defaultTimeout = defaultTimeout;
 
     typename DatabaseT::Ptr drv = connect();
     return drv->isOpen();
