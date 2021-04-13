@@ -271,6 +271,7 @@ bool getArray(const PGresultPtr& pgres, qint32 fieldType, const char* fieldTypeN
     int arraySize = (len - 5 * sizeof(qint32)) / (sizeof(qint32) + sizeof(T));
     if (arraySize != size)
     {
+        // Отладить
         break_point
 
         log_error_m << "Size of array incorrect"
@@ -433,6 +434,7 @@ bool Transaction::begin(IsolationLevel isolationLevel, WritePolicy writePolicy)
     status = pqexecStatus(pgres);
     if (status != PGRES_TUPLES_OK)
     {
+        // Отладить
         break_point
 
         const char* err = PQerrorMessage(_drv->_connect);
@@ -1233,6 +1235,9 @@ bool Result::exec()
 
 bool Result::copyInsert(const QString& table, const QList<QString>& columns, const QString& buffer)
 {
+    // Отладить
+    break_point
+
     const char *errmsg = nullptr;
 
     PGresultPtr pgres;
@@ -1352,8 +1357,8 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
 
     if (rowIdx < 0) // not interested in actual values
     {
+        // Отладить
         break_point
-        // отладить
 
         log_warn_m << "Condition happened: rowIdx < 0";
         return true;
@@ -1527,8 +1532,8 @@ bool Result::reset(const QString& query)
 
 int Result::size()
 {
+    // Отладить
     break_point
-    // отладить
 
     if (!isActive() || !isSelectSql() || _preparedQuery.isEmpty())
     {
@@ -1592,8 +1597,8 @@ int Result::size()
 
 int Result::numRowsAffected()
 {
+    // Написать реализацию
     break_point
-    // написать реализацию
 
     return -1;
 }
