@@ -831,12 +831,6 @@ bool Result::prepare(const QString& query)
     int nfields = PQnfields(_stmt);
     setSelect(nfields != 0);
 
-//    if (nfields == 0)
-//    {
-//        break_point
-//        // отладить
-//    }
-
     _preparedQuery = pgQuery;
 
     log_debug2_m << "End prepare query"
@@ -1840,8 +1834,6 @@ bool Driver::open(const QString& db,
     }
 
     _threadId = trd::gettid();
-
-    //int a = PQbeginBatchMode(_connect);
 
     setOpen(true);
     setOpenError(false);
