@@ -1724,7 +1724,7 @@ bool Driver::open(const QString& db,
 
         setOpenError(true);
         PQfinish(_connect);
-        _connect = 0;
+        _connect = nullptr;
         return false;
     }
 
@@ -1738,7 +1738,7 @@ bool Driver::open(const QString& db,
 
         setOpenError(true);
         PQfinish(_connect);
-        _connect = 0;
+        _connect = nullptr;
         return false;
     }
 
@@ -1752,7 +1752,7 @@ bool Driver::open(const QString& db,
 
         setOpenError(true);
         PQfinish(_connect);
-        _connect = 0;
+        _connect = nullptr;
         return false;
     }
 
@@ -1813,7 +1813,7 @@ bool Driver::open(const QString& db,
 
         setOpenError(true);
         PQfinish(_connect);
-        _connect = 0;
+        _connect = nullptr;
         return false;
     }
 */
@@ -1830,7 +1830,7 @@ bool Driver::open(const QString& db,
 
         setOpenError(true);
         PQfinish(_connect);
-        _connect = 0;
+        _connect = nullptr;
         return false;
     }
 
@@ -1863,7 +1863,7 @@ void Driver::close()
     if (_connect)
         PQfinish(_connect);
 
-    _connect = 0;
+    _connect = nullptr;
     _threadId = 0;
     _transactNumber = 0;
 

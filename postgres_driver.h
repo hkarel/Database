@@ -266,7 +266,7 @@ private:
     Driver();
     DISABLE_DEFAULT_COPY(Driver)
 
-    PGconn* _connect = {0};
+    PGconn* _connect = {nullptr};
     pid_t   _threadId = {0};
     quint64 _transactNumber = {0};
     std::atomic_bool _operationIsAborted = {false};
@@ -279,7 +279,6 @@ private:
 Transaction::Ptr createTransact(const DriverPtr&);
 QSqlResult* createResult(const DriverPtr&);
 QSqlResult* createResult(const Transaction::Ptr&);
-
 
 } // namespace postgres
 } // namespace db
