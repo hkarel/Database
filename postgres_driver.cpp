@@ -1368,8 +1368,7 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
 #endif
                 const QUuid& uuid =
                     QUuid::fromRfc4122(QByteArray::fromRawData(value, 16));
-                const QUuidEx& uuidex = static_cast<const QUuidEx&>(uuid);
-                row[idx].setValue(uuidex);
+                row[idx].setValue(uuid);
                 break;
             }
             case PG_TYPE_INT4_ARRAY:
