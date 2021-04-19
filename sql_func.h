@@ -26,8 +26,8 @@
 #pragma once
 
 #include "qmetatypes.h"
-#include "shared/qt/quuidex.h"
 #include "shared/prog_abort.h"
+#include "shared/qt/quuidex.h"
 #include "shared/logger/logger.h"
 
 #include <QtSql>
@@ -170,6 +170,12 @@ void assignValue(T& val, const QSqlRecord& rec, const QString& fieldName,
         quint32 v2 = *((quint32*) &v);
         val = static_cast<T>(v2);
     }
+}
+
+template<int N>
+void assignValue(QUuidT<N>& val, const QSqlRecord& rec, const QString& fieldName)
+{
+    assignValue(static_cast<QUuid&>(val), rec, fieldName);
 }
 
 template<typename T>
