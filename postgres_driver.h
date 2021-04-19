@@ -119,6 +119,7 @@ public:
 private:
     Transaction(const DriverPtr&);
     DISABLE_DEFAULT_FUNC(Transaction)
+
     quint64 transactId() const {return _transactId;}
 
 private:

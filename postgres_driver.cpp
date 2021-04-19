@@ -825,9 +825,8 @@ bool Result::prepare(const QString& query)
     _stmt = pgres;
 
     // nfields - число столбцов (полей) в каждой строке полученной выборки.
-    // При выполнении INSERT или UPDATE запроса, столбцы не выбираются, поэтому
-    // предполагаем количество таких столбцов будет равно 0. В этом случае запрос
-    // будет установлен как "Not Select".
+    // При выполнении INSERT или UPDATE запросов, количество столбцов будет
+    // равно 0. В этом случае запрос будет установлен как "Not Select"
     int nfields = PQnfields(_stmt);
     setSelect(nfields != 0);
 
@@ -1440,8 +1439,12 @@ bool Result::reset(const QString& query)
 
 int Result::size()
 {
-    // Отладить
-    break_point
+    // Характеристика DriverFeature::QuerySize не может быть полноценно
+    // реализована для этого  драйвера,  поэтому  метод  size()  должен
+    // возвращать -1
+    return -1;
+
+    /*** Код оставлен в качестве примера ***
 
     if (!isActive() || !isSelectSql() || _preparedQuery.isEmpty())
     {
@@ -1501,6 +1504,7 @@ int Result::size()
 
     q.first();
     return q.record().value(0).toInt();
+    */
 }
 
 int Result::numRowsAffected()
@@ -1669,7 +1673,8 @@ bool Driver::open(const QString& db,
         return false;
     }
 
-/*
+    /*** Код оставлен в качестве примера ***
+
     PGresult* result = PQexec(_connection, "SHOW server_version");
     int status = PQresultStatus(result);
     if ((status == PGRES_COMMAND_OK) || (status == PGRES_TUPLES_OK))
@@ -1710,9 +1715,7 @@ bool Driver::open(const QString& db,
         _connection = 0;
         return false;
     }
-*/
 
-/*
     PGresult* result = PQexec(_connect, "SET CLIENT_ENCODING TO 'UNICODE'");
     int status = PQresultStatus(result);
     PQclear(result);
@@ -1729,11 +1732,12 @@ bool Driver::open(const QString& db,
         _connect = nullptr;
         return false;
     }
-*/
 
-    //int enc = PQclientEncoding(_connect);
-    //const char* encName = pg_encoding_to_char(enc);
-    //if (strcmp(encName, "UTF8") != 0)
+    int enc = PQclientEncoding(_connect);
+    const char* encName = pg_encoding_to_char(enc);
+    if (strcmp(encName, "UTF8") != 0)
+    */
+
     if (PQsetClientEncoding(_connect, "UTF8") == -1)
     {
         const char* msg = "Only UTF8 encoding is support";
@@ -1824,9 +1828,9 @@ bool Driver::hasFeature(DriverFeature f) const
         case SimpleLocking:
         case FinishQuery:
         case MultipleResultSets:
+        case QuerySize:
             return false;
 
-        case QuerySize:
         case Transactions:
         case PreparedQueries:
         case PositionalPlaceholders:
