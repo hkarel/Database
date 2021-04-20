@@ -340,19 +340,19 @@ bool setArray(qint32 paramType, const char* paramTypeName, qint32 paramIndex,
 
 //------------------------------- Transaction --------------------------------
 
+Transaction::Transaction(const DriverPtr& drv) : _drv(drv)
+{
+    log_debug2_m << "Transaction ctor. Address: " << addrToNumber(this);
+    Q_ASSERT(_drv.get());
+    _drv->captureTransactAddr(this);
+}
+
 Transaction::~Transaction()
 {
     log_debug2_m << "Transaction dtor. Address: " << addrToNumber(this);
     if (isActive())
         rollback();
     _drv->releaseTransactAddr(this);
-}
-
-Transaction::Transaction(const DriverPtr& drv) : _drv(drv)
-{
-    log_debug2_m << "Transaction ctor. Address: " << addrToNumber(this);
-    Q_ASSERT(_drv.get());
-    _drv->captureTransactAddr(this);
 }
 
 bool Transaction::begin(IsolationLevel isolationLevel, WritePolicy writePolicy)
