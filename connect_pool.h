@@ -57,19 +57,19 @@ public:
 
     ConnectPool() = default;
 
-    // Параметр defaultTimeout задает время по умолчанию  (в секундах)
-    // по истечении которого соединение с БД будет закрыто при условии
-    // бездействия этого соединения
+    // Параметр defaultTimeout задает время по умолчанию (в секундах)  по исте-
+    // чении которого соединение с БД  будет закрыто  при  условии  бездействия
+    // этого соединения
     bool init(InitFunc, int defaultTimeout = DEFAULT_TIMEOUT);
     void close();
 
     void abortOperations();
     void abortOperation(pid_t threadId);
 
-    // Параметр timeout задает время (в секундах)  по истечении  которого
-    // соединение с  БД  будет  закрыто  при  условии  бездействия  этого
-    // соединения. Если timeout меньше или равно 0, то в качестве таймаута
-    // будет использоваться defaultTimeout
+    // Параметр timeout задает время (в секундах) по истечении которого  соеди-
+    // нение с БД будет  закрыто  при  условии  бездействия  этого  соединения.
+    // Если timeout меньше или равно 0, то в качестве таймаута будет  использо-
+    // ваться defaultTimeout
     typename DatabaseT::Ptr connect(int timeout = 0);
 
     // Определяет режим создания нового подключения к базе данных. По умолчанию
@@ -89,12 +89,12 @@ public:
     // Здесь sql-запрос  не будет  корректно  выполняться  для  компонента  q2,
     // так как con1 и con2  ссылаются  на  одно  подключение к БД, и экземпляр
     // транзакции уже неявно создан  для  компонента q1.  Установка  параметра
-    // singleConnection в FALSE позволит при каждом  вызове  метода connect()
+    // singleConnect в FALSE позволит  при  каждом  вызове  метода  connect()
     // создавать новое подключении к БД, таким образом пример будет корректно
     // работать.
     // По умолчанию параметр равен TRUE (одни поток - одно подключение к БД)
-    bool singleConnection() const;
-    void setSingleConnection(bool);
+    bool singleConnect() const;
+    void setSingleConnect(bool);
 
 private:
     DISABLE_DEFAULT_COPY(ConnectPool)
@@ -112,7 +112,7 @@ private:
 
     QMutex _poolLock;
     InitFunc _initFunc;
-    bool _singleConnection = {true};
+    bool _singleConnect = {true};
     int _defaultTimeout = {DEFAULT_TIMEOUT};
 
     QList<typename Data::Ptr> _connectList;
@@ -190,7 +190,7 @@ typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect(int timeout)
     pid_t threadId = trd::gettid();
     typename DatabaseT::Ptr driver;
 
-    if (_singleConnection)
+    if (_singleConnect)
     {
         // В каждом потоке используем только одно подключение к БД
         for (const typename Data::Ptr& d : _connectList)
@@ -267,17 +267,17 @@ typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect(int timeout)
 }
 
 template<typename DatabaseT>
-bool ConnectPool<DatabaseT>::singleConnection() const
+bool ConnectPool<DatabaseT>::singleConnect() const
 {
     QMutexLocker locker {&_poolLock}; (void) locker;
-    return _singleConnection;
+    return _singleConnect;
 }
 
 template<typename DatabaseT>
-void ConnectPool<DatabaseT>::setSingleConnection(bool val)
+void ConnectPool<DatabaseT>::setSingleConnect(bool val)
 {
     QMutexLocker locker {&_poolLock}; (void) locker;
-    _singleConnection = val;
+    _singleConnect = val;
 }
 
 } // namespace db
