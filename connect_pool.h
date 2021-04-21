@@ -52,6 +52,7 @@ template<typename DatabaseT>
 class ConnectPool
 {
 public:
+    static const int DEFAULT_TIMEOUT = 10*60; /*10 мин*/
     typedef std::function<bool (typename DatabaseT::Ptr)> InitFunc;
 
     ConnectPool() = default;
@@ -59,7 +60,7 @@ public:
     // Параметр defaultTimeout задает время по умолчанию  (в секундах)
     // по истечении которого соединение с БД будет закрыто при условии
     // бездействия этого соединения
-    bool init(InitFunc, int defaultTimeout = 10*60 /*10 мин*/);
+    bool init(InitFunc, int defaultTimeout = DEFAULT_TIMEOUT);
     void close();
 
     void abortOperations();
@@ -71,6 +72,30 @@ public:
     // будет использоваться defaultTimeout
     typename DatabaseT::Ptr connect(int timeout = 0);
 
+    // Определяет режим создания нового подключения к базе данных. По умолчанию
+    // пул коннектов создает в одном потоке исполнения только одно  подключение
+    // к базе данных. Для некоторых драйверов БД (Postgres) это является  проб-
+    // лемой, так как они не могут создавать несколько  экземпляров  транзакций
+    // в рамках одного подключения. Рассмотрим  пример  использования  Postgres
+    // драйвера:
+    //   func() {
+    //     PgDriver con1 = pgpool.connect();
+    //     QSqlQuery q1 {con1->createResult()}; - внутри создается транзакция
+    //     ...
+    //     PgDriver con2 = pgpool.connect();
+    //     QSqlQuery q2 {con2->createResult()}; - внутри создается транзакция
+    //     ...
+    //   }
+    // Здесь sql-запрос  не будет  корректно  выполняться  для  компонента  q2,
+    // так как con1 и con2  ссылаются  на  одно  подключение к БД, и экземпляр
+    // транзакции уже неявно создан  для  компонента q1.  Установка  параметра
+    // singleConnection в FALSE позволит при каждом  вызове  метода connect()
+    // создавать новое подключении к БД, таким образом пример будет корректно
+    // работать.
+    // По умолчанию параметр равен TRUE (одни поток - одно подключение к БД)
+    bool singleConnection() const;
+    void setSingleConnection(bool);
+
 private:
     DISABLE_DEFAULT_COPY(ConnectPool)
 
@@ -81,14 +106,16 @@ private:
         typename DatabaseT::Ptr driver;
         bool inUse = {false};
         pid_t threadId = {0};
-        int timeout = {60}; /*60 сек*/
         simple_timer timer;
+        int timeout = {DEFAULT_TIMEOUT};
     };
 
-    QList<typename Data::Ptr> _connectList;
-    InitFunc _initFunc;
     QMutex _poolLock;
-    int _defaultTimeout;
+    InitFunc _initFunc;
+    bool _singleConnection = {true};
+    int _defaultTimeout = {DEFAULT_TIMEOUT};
+
+    QList<typename Data::Ptr> _connectList;
 
     template<typename T, int> friend T& ::safe_singleton();
 };
@@ -96,9 +123,11 @@ private:
 template<typename DatabaseT>
 bool ConnectPool<DatabaseT>::init(InitFunc initFunc, int defaultTimeout)
 {
-    _initFunc = initFunc;
-    _defaultTimeout = defaultTimeout;
-
+    { //Block for QMutexLocker
+        QMutexLocker locker {&_poolLock}; (void) locker;
+        _initFunc = initFunc;
+        _defaultTimeout = defaultTimeout;
+    }
     typename DatabaseT::Ptr drv = connect();
     return drv->isOpen();
 }
@@ -161,14 +190,17 @@ typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect(int timeout)
     pid_t threadId = trd::gettid();
     typename DatabaseT::Ptr driver;
 
-    // В каждом потоке используем только одно подключение к БД
-    for (const typename Data::Ptr& d : _connectList)
-        if (d->threadId == threadId
-            && d->driver->clife_count() > 1)
-        {
-            driver = d->driver;
-            break;
-        }
+    if (_singleConnection)
+    {
+        // В каждом потоке используем только одно подключение к БД
+        for (const typename Data::Ptr& d : _connectList)
+            if (d->threadId == threadId
+                && d->driver->clife_count() > 1)
+            {
+                driver = d->driver;
+                break;
+            }
+    }
 
     if (driver.empty())
         for (typename Data::Ptr& d : _connectList)
@@ -232,6 +264,20 @@ typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect(int timeout)
             driver->abortOperation();
     }
     return driver;
+}
+
+template<typename DatabaseT>
+bool ConnectPool<DatabaseT>::singleConnection() const
+{
+    QMutexLocker locker {&_poolLock}; (void) locker;
+    return _singleConnection;
+}
+
+template<typename DatabaseT>
+void ConnectPool<DatabaseT>::setSingleConnection(bool val)
+{
+    QMutexLocker locker {&_poolLock}; (void) locker;
+    _singleConnection = val;
 }
 
 } // namespace db
