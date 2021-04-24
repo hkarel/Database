@@ -688,17 +688,17 @@ char* createArrayBuffer(char* buffer, const QList<QVariant>& list,
 
 //------------------------------- Transaction --------------------------------
 
+Transaction::Transaction(const DriverPtr& drv) : _drv(drv)
+{
+    log_debug2_m << "Transaction ctor";
+    Q_ASSERT(_drv.get());
+}
+
 Transaction::~Transaction()
 {
     log_debug2_m << "Transaction dtor";
     if (isActive())
         rollback();
-}
-
-Transaction::Transaction(const DriverPtr& drv) : _drv(drv)
-{
-    log_debug2_m << "Transaction ctor";
-    Q_ASSERT(_drv.get());
 }
 
 bool Transaction::begin()
@@ -2553,6 +2553,7 @@ void qEventCallback(void* result, ISC_USHORT length, const ISC_UCHAR* updated)
     if (!updated)
         return;
 
+    // Отладить
     break_point
 
     memcpy(result, updated, length);
@@ -2589,6 +2590,7 @@ QStringList Driver::subscribedToNotifications() const
 
 bool Driver::subscribeToNotificationImplementation(const QString& name)
 {
+    // Отладить
     break_point
 
     if (!isOpen())
@@ -2638,6 +2640,7 @@ bool Driver::subscribeToNotificationImplementation(const QString& name)
 
 bool Driver::unsubscribeFromNotificationImplementation(const QString& name)
 {
+    // Отладить
     break_point
 
     if (!isOpen())
@@ -2671,12 +2674,15 @@ bool Driver::unsubscribeFromNotificationImplementation(const QString& name)
 
 QStringList Driver::subscribedToNotificationsImplementation() const
 {
+    // Отладить
     break_point
+
     return QStringList(_eventBuffers.keys());
 }
 
 void Driver::qHandleEventNotification(void* updatedResultBuffer)
 {
+    // Отладить
     break_point
 
     //QMap<QString, QFirebirdEventBuffer*>::const_iterator i;
