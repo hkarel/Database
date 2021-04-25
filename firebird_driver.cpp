@@ -50,7 +50,6 @@
 #include <QVariant>
 #include <QSqlField>
 #include <QSqlIndex>
-#include <QSqlQuery>
 #include <QVarLengthArray>
 #include <cstdlib>
 #include <utility>
@@ -1728,7 +1727,7 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
                 break;
 
             case SQL_FLOAT:
-                row[idx] = QVariant(double((*(float*)sqlVar.sqldata)));
+                row[idx] = QVariant((*(float*)sqlVar.sqldata));
                 break;
 
             case SQL_DOUBLE:
@@ -1753,10 +1752,9 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
                 {
                     if (sqlVar.sqllen == 16)
                     {
-                        const QUuid& uuid = QUuidEx::fromRfc4122(QByteArray::fromRawData(
-                                                                 sqlVar.sqldata, sqlVar.sqllen));
-                        const QUuidEx& uuidex = static_cast<const QUuidEx&>(uuid);
-                        row[idx].setValue(uuidex);
+                        const QUuid& uuid =
+                            QUuid::fromRfc4122(QByteArray::fromRawData(sqlVar.sqldata, 16));
+                        row[idx].setValue(uuid);
                     }
                     else
                         row[idx] = QByteArray(sqlVar.sqldata, sqlVar.sqllen);
@@ -1826,66 +1824,12 @@ bool Result::reset(const QString& query)
 
 int Result::size()
 {
-    if (!isActive() || !isSelectSql() || _preparedQuery.isEmpty())
-    {
-        log_error_m << "Size of result unavailable";
-        return -1;
-    }
+    // Характеристика DriverFeature::QuerySize не может быть полноценно
+    // реализована для этого  драйвера,  поэтому  метод  size()  должен
+    // возвращать -1
+    return -1;
 
-    Transaction::Ptr transact =
-        (_externalTransact) ? _externalTransact : _internalTransact;
-
-    if (transact.empty())
-    {
-        log_error_m << "Size of result unavailable"
-                       ". Detail: Transaction not created";
-        return -1;
-    }
-    if (!transact->isActive())
-    {
-        log_error_m << "Size of result unavailable"
-                       ". Detail: Transaction not active";
-        return -1;
-    }
-
-    int pos = _preparedQuery.indexOf("FROM", Qt::CaseInsensitive);
-    if (pos == -1)
-    {
-        log_error_m << "Size of result unavailable"
-                       ". Detail: Sql-statement not contains 'FROM' keyword";
-        return -1;
-    }
-
-    QString query = "SELECT COUNT(*) " + _preparedQuery.mid(pos);
-
-    pos = query.indexOf("ORDER BY", Qt::CaseInsensitive);
-    if (pos != -1)
-        query.remove(pos, query.length());
-
-    QSqlQuery q {createResult(transact)};
-
-    if (!q.prepare(query))
-    {
-        log_error_m << "Size of result unavailable";
-        return -1;
-    }
-
-    const QVector<QVariant>& values = boundValues();
-    for (int i = 0; i < values.count(); ++i)
-    {
-        const QVariant& val = values[i];
-        q.addBindValue(val);
-    }
-    if (!q.exec())
-    {
-        log_error_m << "Size of result unavailable";
-        return -1;
-    }
-
-    q.first();
-    return q.record().value(0).toInt();
-
-
+   //--- Код от первичной реализации, оставлен в качестве примера ---
 #if 0 /// ### FIXME
     static char sizeInfo[] = {isc_info_sql_records};
     char buf[64];
@@ -1933,13 +1877,75 @@ int Result::size()
 #endif
 }
 
+int Result::size2() const
+{
+    if (!isSelectSql() || _preparedQuery.isEmpty())
+    {
+        log_error_m << "Size of result unavailable"
+                    << ". Detail: Sql-statement not SELETC or not prepared";
+        return -1;
+    }
+
+    Transaction::Ptr transact =
+        (_externalTransact) ? _externalTransact : _internalTransact;
+
+    if (transact.empty())
+    {
+        log_error_m << "Size of result unavailable"
+                       ". Detail: Transaction not created";
+        return -1;
+    }
+    if (!transact->isActive())
+    {
+        log_error_m << "Size of result unavailable"
+                       ". Detail: Transaction not active";
+        return -1;
+    }
+
+    int pos = _preparedQuery.indexOf("FROM", Qt::CaseInsensitive);
+    if (pos == -1)
+    {
+        log_error_m << "Size of result unavailable"
+                       ". Detail: Sql-statement not contains 'FROM' keyword";
+        return -1;
+    }
+
+    QString query = "SELECT COUNT(*) " + _preparedQuery.mid(pos);
+
+    pos = query.indexOf("ORDER BY", Qt::CaseInsensitive);
+    if (pos != -1)
+        query.remove(pos, query.length());
+
+    QSqlQuery q {createResult(transact)};
+
+    if (!q.prepare(query))
+    {
+        log_error_m << "Size of result unavailable"
+                    << ". Detail: Failed prepare Sql-statement";
+        return -1;
+    }
+
+    const QVector<QVariant>& values = boundValues();
+    for (int i = 0; i < values.count(); ++i)
+    {
+        const QVariant& val = values[i];
+        q.addBindValue(val);
+    }
+    if (!q.exec())
+    {
+        log_error_m << "Size of result unavailable"
+                    << ". Detail: Failed execute Sql-statement";
+        return -1;
+    }
+
+    q.first();
+    return q.record().value(0).toInt();
+}
+
 int Result::numRowsAffected()
 {
     char cCountType;
     char acCountInfo[] = {isc_info_sql_records};
-
-    // Если попали в эту точку - сказать об этом Карелину
-    break_point
 
     switch (_queryType)
     {
@@ -2044,7 +2050,7 @@ QVariant Result::handle() const
 
 //-------------------------------- Driver ------------------------------------
 
-Driver::Driver() : QSqlDriver(0)
+Driver::Driver() : QSqlDriver(nullptr)
 {}
 
 Driver::~Driver()
@@ -2198,6 +2204,7 @@ void Driver::close()
 
     if (_eventBuffers.size())
     {
+        // Отладить
         break_point
 
         ISC_STATUS status[20];
@@ -2280,7 +2287,12 @@ bool Driver::hasFeature(DriverFeature f) const
         case MultipleResultSets:
             return false;
 
+        // Характеристика не может быть полноценно реализована  для  этого
+        // драйвера. Количество записей для предварительно подготовленного
+        // запроса можно получить при помощи функции resultSize()
         case QuerySize:
+            return false;
+
         case Transactions:
         case PreparedQueries:
         case PositionalPlaceholders:
@@ -2295,21 +2307,18 @@ bool Driver::hasFeature(DriverFeature f) const
 
 bool Driver::beginTransaction()
 {
-    //break_point
     log_debug2_m << "Call beginTransaction()";
     return false;
 }
 
 bool Driver::commitTransaction()
 {
-    //break_point
     log_debug2_m << "Call commitTransaction()";
     return false;
 }
 
 bool Driver::rollbackTransaction()
 {
-    //break_point
     log_debug2_m << "Call rollbackTransaction()";
     return false;
 }
@@ -2433,6 +2442,9 @@ QSqlRecord Driver::record(const QString& tableName) const
 
 QSqlIndex Driver::primaryIndex(const QString& tableName) const
 {
+    // Отладить
+    break_point
+
     QSqlIndex index {tableName};
     if (!isOpen())
         return index;
@@ -2442,9 +2454,6 @@ QSqlIndex Driver::primaryIndex(const QString& tableName) const
         table = stripDelimiters(table, QSqlDriver::TableName);
     else
         table = table.toUpper();
-
-    break_point
-    // Проверить работу
 
     QSqlQuery q {createResult()};
     q.setForwardOnly(true);
@@ -2806,6 +2815,14 @@ bool setIgnoreSIGTERM()
         return false;
     }
     return true;
+}
+
+int resultSize(const QSqlQuery& q)
+{
+    if (const Result* r = dynamic_cast<const Result*>(q.result()))
+        return r->size2();
+
+    return -1;
 }
 
 #undef CHECK_ERROR

@@ -49,6 +49,7 @@
 
 #include <QSqlError>
 #include <QSqlDriver>
+#include <QSqlQuery>
 #include <QSqlResult>
 #include <ibase.h>
 #include <atomic>
@@ -120,6 +121,10 @@ protected:
     int  numRowsAffected() override;
     QSqlRecord record() const override;
 
+    // Вспомогательная функция, возвращает количество записей для предварительно
+    // подготовленного запроса
+    int size2() const;
+
 private:
     // Возвращает TRUE если sql-выражение  является  SELECT-запросом  или если
     // в sql-выражении вызывается хранимая процедура возвращающая набор данных.
@@ -151,6 +156,8 @@ private:
     XSQLDA*          _inda       = {0};  // input parameters
     int              _queryType  = {-1}; // Тип sql-запроса
     QString          _preparedQuery;     // Содержит подготовленный запрос
+
+    friend int resultSize(const QSqlQuery&);
 };
 
 class Driver final : public QSqlDriver, public clife_base
@@ -268,6 +275,9 @@ QSqlResult* createResult(const Transaction::Ptr&);
 
 // Блокирует обработку SIGTERM внутри драйвера БД
 bool setIgnoreSIGTERM();
+
+// Возвращает количество записей для предварительно подготовленного запроса
+int resultSize(const QSqlQuery&);
 
 } // namespace firebird
 } // namespace db
