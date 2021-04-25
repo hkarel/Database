@@ -39,7 +39,6 @@
 #include <QVariant>
 #include <QSqlField>
 #include <QSqlIndex>
-#include <QSqlQuery>
 #include <QVarLengthArray>
 #include <cstdlib>
 #include <utility>
@@ -653,6 +652,7 @@ void Result::cleanup()
 
     _stmtName.clear();
     _preparedQuery.clear();
+    _numRowsAffected = -1;
     SqlCachedResult::cleanup();
 
     log_debug2_m << "End dataset cleanup. Connect: " << addrToNumber(_drv->_connect);
@@ -1219,6 +1219,7 @@ bool Result::exec()
             return false;
         }
 
+    _numRowsAffected = 0;
     setActive(true);
 
     log_debug2_m << "End exec query"
@@ -1425,6 +1426,7 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
 
     } // for (int i = 0; i < nfields; ++i)
 
+    _numRowsAffected += 1;
     return true;
 }
 
@@ -1442,28 +1444,21 @@ int Result::size()
     // реализована для этого  драйвера,  поэтому  метод  size()  должен
     // возвращать -1
     return -1;
+}
 
-    /*** Код оставлен в качестве примера ***
-
-    if (!isActive() || !isSelectSql() || _preparedQuery.isEmpty())
+int Result::size2(const DriverPtr& drv) const
+{
+    if (!isSelectSql() || _preparedQuery.isEmpty())
     {
-        log_error_m << "Size of result unavailable";
+        log_error_m << "Size of result unavailable"
+                    << ". Detail: Sql-statement not SELETC or not prepared";
         return -1;
     }
 
-    Transaction::Ptr transact =
-        (_externalTransact) ? _externalTransact : _internalTransact;
-
-    if (transact.empty())
+    if (_drv.get() == drv.get())
     {
         log_error_m << "Size of result unavailable"
-                       ". Detail: Transaction not created";
-        return -1;
-    }
-    if (!transact->isActive())
-    {
-        log_error_m << "Size of result unavailable"
-                       ". Detail: Transaction not active";
+                    << ". Detail: It is not allowed to use the same database connection";
         return -1;
     }
 
@@ -1471,7 +1466,7 @@ int Result::size()
     if (pos == -1)
     {
         log_error_m << "Size of result unavailable"
-                       ". Detail: Sql-statement not contains 'FROM' keyword";
+                    << ". Detail: Sql-statement not contains 'FROM' keyword";
         return -1;
     }
 
@@ -1481,11 +1476,12 @@ int Result::size()
     if (pos != -1)
         query.remove(pos, query.length());
 
-    QSqlQuery q {createResult(transact)};
+    QSqlQuery q {drv->createResult()};
 
     if (!q.prepare(query))
     {
-        log_error_m << "Size of result unavailable";
+        log_error_m << "Size of result unavailable"
+                    << ". Detail: Failed prepare Sql-statement";
         return -1;
     }
 
@@ -1497,21 +1493,18 @@ int Result::size()
     }
     if (!q.exec())
     {
-        log_error_m << "Size of result unavailable";
+        log_error_m << "Size of result unavailable"
+                    << ". Detail: Failed execute Sql-statement";
         return -1;
     }
 
     q.first();
     return q.record().value(0).toInt();
-    */
 }
 
 int Result::numRowsAffected()
 {
-    // Написать реализацию
-    break_point
-
-    return -1;
+    return _numRowsAffected;
 }
 
 QSqlRecord Result::record() const
@@ -1553,7 +1546,7 @@ QSqlRecord Result::record() const
 
 //-------------------------------- Driver ------------------------------------
 
-Driver::Driver() : QSqlDriver(0)
+Driver::Driver() : QSqlDriver(nullptr)
 {}
 
 Driver::~Driver()
@@ -1827,6 +1820,11 @@ bool Driver::hasFeature(DriverFeature f) const
         case SimpleLocking:
         case FinishQuery:
         case MultipleResultSets:
+            return false;
+
+        // Характеристика не может быть полноценно реализована  для  этого
+        // драйвера. Количество записей для предварительно подготовленного
+        // запроса можно получить при помощи функции resultSize()
         case QuerySize:
             return false;
 
@@ -1999,6 +1997,14 @@ QSqlResult* createResult(const DriverPtr& driver)
 QSqlResult* createResult(const Transaction::Ptr& transact)
 {
     return new Result(transact, Result::ForwardOnly::Yes);
+}
+
+int resultSize(const QSqlQuery& q, const DriverPtr& drv)
+{
+    if (const Result* r = dynamic_cast<const Result*>(q.result()))
+        return r->size2(drv);
+
+    return -1;
 }
 
 } // namespace postgres

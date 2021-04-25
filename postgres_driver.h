@@ -35,6 +35,7 @@
 
 #include <QSqlError>
 #include <QSqlDriver>
+#include <QSqlQuery>
 #include <QSqlResult>
 
 #include <libpq-fe.h>
@@ -151,6 +152,10 @@ protected:
     int  numRowsAffected() override;
     QSqlRecord record() const override;
 
+    // Вспомогательная функция, возвращает количество записей для предварительно
+    // подготовленного запроса
+    int size2(const DriverPtr&) const;
+
 private:
     // Возвращает TRUE если sql-выражение  является  SELECT-запросом  или если
     // в sql-выражении вызывается хранимая процедура возвращающая набор данных.
@@ -174,6 +179,9 @@ private:
     QByteArray       _stmtName;
     PGresultPtr      _stmt;
     QString          _preparedQuery; // Содержит подготовленный запрос
+    int              _numRowsAffected = {-1};
+
+    friend int resultSize(const QSqlQuery&, const DriverPtr&);
 };
 
 class Driver final : public QSqlDriver, public clife_base
@@ -271,6 +279,9 @@ private:
 Transaction::Ptr createTransact(const DriverPtr&);
 QSqlResult* createResult(const DriverPtr&);
 QSqlResult* createResult(const Transaction::Ptr&);
+
+// Возвращает количество записей для предварительно подготовленного запроса
+int resultSize(const QSqlQuery&, const DriverPtr&);
 
 } // namespace postgres
 } // namespace db
