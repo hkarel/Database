@@ -178,6 +178,12 @@ void assignValue(QUuidT<N>& val, const QSqlRecord& rec, const QString& fieldName
     assignValue(static_cast<QUuid&>(val), rec, fieldName);
 }
 
+template<int N>
+void assignValue(QVector<QUuidT<N>>& val, const QSqlRecord& rec, const QString& fieldName)
+{
+    assignValue(reinterpret_cast<QVector<QUuid>&>(val), rec, fieldName);
+}
+
 template<typename T>
 void assignValue(QVector<T>& val, const QSqlRecord& rec, const QString& fieldName,
                  typename detail::is_enum_type<T>::type = 0)
