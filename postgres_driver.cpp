@@ -138,13 +138,13 @@ QVariant::Type qPostgresTypeName(int pgType)
             return QVariant::String;
 
         case PG_TYPE_UUID:
-            return QVariant::Type(qMetaTypeId<QUuidEx>());
+            return QVariant::Uuid;
 
         case PG_TYPE_INT4_ARRAY:
             return QVariant::Type(qMetaTypeId<QVector<qint32>>());
 
         case PG_TYPE_UUID_ARRAY:
-            return QVariant::Type(qMetaTypeId<QVector<QUuidEx>>());
+            return QVariant::Type(qMetaTypeId<QVector<QUuid>>());
     }
     return QVariant::Invalid;
 }
@@ -1092,13 +1092,43 @@ bool Result::exec()
                     };
                     if (!setArray<qint32>(PG_TYPE_INT32, "PG_TYPE_INT32", i, val, fillingFunc, params))
                     {
+                        rollbackInternalTransact();
                         return false;
                     }
                     break;
                 }
                 case PG_TYPE_UUID_ARRAY:
                 {
-                    if (!val.canConvert<QVector<QUuidEx>>())
+                    auto fillingFunc = [](qint32* ptrArray, auto& array)
+                    {
+                        for (int i = 0; i < array.count(); ++i)
+                        {
+                            const QUuid& item = array.at(i);
+                            *ptrArray++ = bswap_32((qint32)sizeof(QUuid));
+
+                            const QByteArray& ba = item.toRfc4122();
+                            memcpy(ptrArray, ba.constData(), 16);
+                            ptrArray += 4;
+                        }
+                    };
+
+                    if (val.canConvert<QVector<QUuidEx>>())
+                    {
+                        if (!setArray<QUuidEx>(PG_TYPE_UUID, "PG_TYPE_UUID", i, val, fillingFunc, params))
+                        {
+                            rollbackInternalTransact();
+                            return false;
+                        }
+                    }
+                    else if (val.canConvert<QVector<QUuid>>())
+                    {
+                        if (!setArray<QUuid>(PG_TYPE_UUID, "PG_TYPE_UUID", i, val, fillingFunc, params))
+                        {
+                            rollbackInternalTransact();
+                            return false;
+                        }
+                    }
+                    else
                     {
                         QString msg =
                             "Query param%1 can't convert to Vector<PG_TYPE_UUID> type"
@@ -1108,22 +1138,6 @@ bool Result::exec()
                                  .arg(transactId());
                         SET_LAST_ERROR(msg, QSqlError::StatementError)
                         rollbackInternalTransact();
-                        return false;
-                    }
-
-                    auto fillingFunc = [](qint32* ptrArray, QVector<QUuidEx>& array)
-                    {
-                        for (const QUuidEx& item : array)
-                        {
-                            *ptrArray++ = bswap_32((qint32)sizeof(QUuidEx));
-
-                            const QByteArray& ba = item.toRfc4122();
-                            memcpy(ptrArray, ba.constData(), 16);
-                            ptrArray += 4;
-                        }
-                    };
-                    if (!setArray<QUuidEx>(PG_TYPE_UUID, "PG_TYPE_UUID", i, val, fillingFunc, params))
-                    {
                         return false;
                     }
                     break;
@@ -1360,7 +1374,6 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
                 {
                     log_error_m << "Raw uuid field must be 16 bytes"
                                 << ". Field index: " << i;
-                    //row[idx].setValue(QUuidEx());
                     setAt(QSql::AfterLastRow);
                     return false;
                 }
@@ -1386,33 +1399,28 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
                     setAt(QSql::AfterLastRow);
                     return false;
                 }
-
                 row[idx].setValue(array);
                 break;
             }
             case PG_TYPE_UUID_ARRAY:
             {
-                QVector<QUuidEx> array;
-                auto fillingFunc = [](qint32* ptrArray, QVector<QUuidEx>& array)
+                QVector<QUuid> array;
+                auto fillingFunc = [](qint32* ptrArray, QVector<QUuid>& array)
                 {
                     for (int i = 0; i < array.count(); ++i)
                     {
                         ++ptrArray; // Пропустить размер значения
-
                         const QUuid& uuid =
                             QUuid::fromRfc4122(QByteArray::fromRawData((char*)ptrArray, 16));
-                        const QUuidEx& uuidex = static_cast<const QUuidEx&>(uuid);
-
-                        array[i] = uuidex;
+                        array[i] = uuid;
                         ptrArray = ptrArray + 4;
                     }
                 };
-                if (!getArray<QUuidEx>(pgres, PG_TYPE_UUID, "PG_TYPE_UUID", i, fillingFunc, array))
+                if (!getArray<QUuid>(pgres, PG_TYPE_UUID, "PG_TYPE_UUID", i, fillingFunc, array))
                 {
                     setAt(QSql::AfterLastRow);
                     return false;
                 }
-
                 row[idx].setValue(array);
                 break;
             }
