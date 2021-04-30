@@ -145,10 +145,8 @@ QVariant::Type qPostgresTypeName(int pgType)
 
         case PG_TYPE_UUID_ARRAY:
             return QVariant::Type(qMetaTypeId<QVector<QUuidEx>>());
-
-        default:
-            return QVariant::Invalid;
     }
+    return QVariant::Invalid;
 }
 
 inline QDate baseDate() {return {2000, 01, 01};}
