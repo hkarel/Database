@@ -212,9 +212,11 @@ QVariant::Type qFirebirdTypeName(int iType, bool hasScale)
             return QVariant::DateTime;
 
         case blr_blob:
+        {
+            // Отладить
             break_point
             return QVariant::ByteArray;
-
+        }
         case blr_quad:
         case blr_short:
         case blr_long:
@@ -224,6 +226,8 @@ QVariant::Type qFirebirdTypeName(int iType, bool hasScale)
             return (hasScale) ? QVariant::Double : QVariant::LongLong;
 
         case blr_float:
+            return QVariant::Type(qMetaTypeId<float>());
+
         case blr_d_float:
         case blr_double:
             return QVariant::Double;
@@ -263,6 +267,8 @@ QVariant::Type qFirebirdTypeName2(int iType, bool hasScale, int subType, int sub
             return (hasScale) ? QVariant::Double : QVariant::LongLong;
 
         case SQL_FLOAT:
+            return QVariant::Type(qMetaTypeId<float>());
+
         case SQL_DOUBLE:
             return QVariant::Double;
 
@@ -280,10 +286,9 @@ QVariant::Type qFirebirdTypeName2(int iType, bool hasScale, int subType, int sub
 
         case SQL_BLOB:
             return QVariant::ByteArray;
-
-        default:
-            return QVariant::Invalid;
     }
+    log_warn_m << "qFirebirdTypeName2(): unknown datatype: " << iType;
+    return QVariant::Invalid;
 }
 
 ISC_TIMESTAMP toTimeStamp(const QDateTime& dt)
@@ -460,11 +465,13 @@ char* readArrayBuffer(QList<QVariant>& list, char* buffer, short curDim,
     }
     if (dim > 0)
     {
+        // Отладить
         break_point
         list.append(valList);
     }
     else
     {
+        // Отладить
         break_point
         list += valList;
     }
@@ -581,6 +588,7 @@ char* createArrayBuffer(char* buffer, const QList<QVariant>& list,
 
     if (list.size() != elements) // size mismatch
     {
+        // Отладить
         break_point
         error = QLatin1String("Array size mismatch. Fieldname: %1. ")
                 + QString("Expected size: %1, supplied size: %2").arg(elements)
