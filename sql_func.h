@@ -236,8 +236,40 @@ QString updateOrInsertStatement(const QString& tableName, const QString& fields,
 QString insertOrUpdateStatementPG(const QString& tableName, const QString& fields,
                                   const QString& matching);
 
+// Генерирует sql-запрос вида:
+// MERGE types_table_target AS Target
+// USING types_table_source AS Source
+//    ON (Target.f_bigint = Source.f_bigint)
+// WHEN MATCHED THEN UPDATE SET
+//    [f_bigint] = Source.[f_bigint]
+//   ,[f_binary] = Source.[f_binary]
+// WHEN NOT MATCHED THEN INSERT VALUES
+// (
+//   Source.[f_bigint]
+//   Source.[f_binary]
+// );
+
+QString mergeRowStatementMS(const QString& tableNameTarget,
+                                  const QVector<QString>& fields, const QVector<QString>& matching);
+// Генерирует sql-запрос вида:
+// MERGE types_table_target AS Target
+// USING types_table_source AS Source
+//    ON (Target.f_bigint = Source.f_bigint)
+// WHEN MATCHED THEN UPDATE SET
+//    [f_bigint] = Source.[f_bigint]
+//   ,[f_binary] = Source.[f_binary]
+// WHEN NOT MATCHED THEN INSERT VALUES
+// (
+//   Source.[f_bigint]
+//   Source.[f_binary]
+// );
+
+QString mergeTableStatementMS(const QString& tableNameTarget, const QString& tableNameSource,
+                                  const QVector<QString>& fields, const QVector<QString>& matching);
 } // namespace sql
 
 #define INSERT_INTO            insertIntoStatement
 #define UPDATE_OR_INSERT_INTO  updateOrInsertStatement
 #define INSERT_OR_UPDATE_PG    insertOrUpdateStatementPG
+#define MERGE_ROW_MS           mergeRowStatementMS
+#define MERGE_TABLE_MS         mergeTableStatementMS
