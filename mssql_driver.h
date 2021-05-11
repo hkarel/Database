@@ -70,12 +70,11 @@ QSqlField qMakeFieldInfo(const SQLHANDLE hStmt, const DriverPtr& p);
 QSqlField qMakeFieldInfo(const Result* p, int i );
 QSqlField qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
 
-//QString qWarnODBCHandle(int handleType, SQLHANDLE handle, int *nativeCode = 0);
-//QString qODBCWarn(const SQLHANDLE hStmt, const SQLHANDLE envHandle = 0, const SQLHANDLE pDbC = 0, int *nativeCode = 0);
 QString qODBCWarn(const Result* odbc, int *nativeCode);
-//void qSqlWarning(const QString& message, const Result* odbc)
-//void qSqlWarning(const QString &message, const SQLHANDLE hStmt);
-//QString qODBCWarn(const Result* odbc, int *nativeCode);
+void qSqlWarning(const QString& message, const Result* odbc, const char* func, int line);
+void qSqlWarning(const QString& message, const Driver *odbc, const char* func, int line);
+void qSqlWarning(const QString& message, const SQLHANDLE hStmt, const char* func, int line);
+
 }
 
 class Result;
@@ -172,9 +171,6 @@ private:
     // в sql-выражении вызывается хранимая процедура возвращающая набор данных.
     bool isSelectSql() const;
 
-    bool checkError(const char* msg, QSqlError::ErrorType type,
-                            const SQLRETURN r, const SQLHANDLE hStmt, const char* func, int line);
-
     void cleanup();
 
     bool beginInternalTransact();
@@ -203,10 +199,11 @@ private:
     friend QSqlField detail::qMakeFieldInfo(const Result* p, int i );
     friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
 
+    friend void detail::qSqlWarning(const QString& message, const Result* odbc, const char* func, int line);
+    friend void detail::qSqlWarning(const QString& message, const Driver *odbc, const char* func, int line);
+    friend void detail::qSqlWarning(const QString& message, const SQLHANDLE hStmt, const char* func, int line);
+
     friend QString detail::qODBCWarn(const Result* odbc, int *nativeCode);
-//    friend void qSqlWarning(const QString& message, const Result* odbc);
-//    friend void qSqlWarning(const QString& message, const Result *odbc);
-//    friend QString qSqlWarning(const QString& message, const SQLHANDLE hStmt);
 
     friend int resultSize(const QSqlQuery&, const DriverPtr&);
 };
@@ -257,9 +254,6 @@ public:
     // его можно будет только закрыть.
     void abortOperation(/*const SQLHANDLE hStmt*/);
 
-//    void addStmt(SQLHANDLE);
-//    void delStmt(SQLHANDLE);
-
     // Возвращает TRUE если sql-операция была прервана
     bool operationIsAborted() const;
     bool setConnectionOptions(const QString& connOpts);
@@ -305,12 +299,14 @@ private:
     bool hasSQLFetchScroll = true;
     bool hasMultiResultSets = false;
 
-    //QList<SQLHANDLE> _resultsList;
-
     friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
     friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, const DriverPtr& p);
     friend QSqlField detail::qMakeFieldInfo(const Result* p, int i );
     friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
+
+    friend void qSqlWarning(const QString& message, const Result* odbc, const char* func, int line);
+    friend void qSqlWarning(const QString& message, const Driver *odbc, const char* func, int line);
+    friend void qSqlWarning(const QString& message, const SQLHANDLE hStmt, const char* func, int line);
 
     //QMutex _stmtMutex;
 };
