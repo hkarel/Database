@@ -1,7 +1,7 @@
 /*****************************************************************************
   The MIT License
 
-  Copyright © 2020 Pavel Karelin (hkarel), <hkarel@yandex.ru>
+  Copyright © 2021 Egorov Vladimir, <egorov.vladimir.n@gmail.com>
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
@@ -37,19 +37,10 @@
 #include <QSqlDriver>
 #include <QSqlResult>
 #include <QSqlDatabase>
-
-#include <atomic>
-#include <QCoreApplication>
-#include <iostream>
-#include <QSqlDatabase>
 #include <QSqlQuery>
-#include <QSqlError>
+
 #include <sqlext.h>
-//#include <SQLNCLI.h>
-#include <sql.h>
-#include <qvariant.h>
 #include <qdatetime.h>
-#include <qsqlerror.h>
 #include <qsqlfield.h>
 #include <qsqlindex.h>
 
@@ -65,15 +56,15 @@ typedef clife_ptr<Driver> DriverPtr;
 
 namespace detail {
 
-QSqlField qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
-QSqlField qMakeFieldInfo(const SQLHANDLE hStmt, const DriverPtr& p);
-QSqlField qMakeFieldInfo(const Result* p, int i );
-QSqlField qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
+QSqlField qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
+QSqlField qMakeFieldInfo(const SQLHANDLE stmt, const DriverPtr&);
+QSqlField qMakeFieldInfo(const Result*, int i );
+QSqlField qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
 
-QString qODBCWarn(const Result* odbc, int *nativeCode);
-void qSqlWarning(const QString& message, const Result* odbc, const char* func, int line);
-void qSqlWarning(const QString& message, const Driver *odbc, const char* func, int line);
-void qSqlWarning(const QString& message, const SQLHANDLE hStmt, const char* func, int line);
+QString qODBCWarn(const Result*, int* nativeCode);
+void qSqlWarning(const QString& message, const Result*, const char* func, int line);
+void qSqlWarning(const QString& message, const Driver*, const char* func, int line);
+void qSqlWarning(const QString& message, const SQLHANDLE stmt, const char* func, int line);
 
 }
 
@@ -94,11 +85,11 @@ public:
 
     enum class IsolationLevel
     {
-        // PostgreSQL only has the better isolation levels.
-        // read_uncommitted,
+        ReadUncommitted,
         ReadCommitted,
         RepeatableRead,
-        Serializable
+        Snapshot,
+        Serializable,
     };
 
     ~Transaction();
@@ -153,7 +144,7 @@ protected:
 
     void updateStmtHandleState()
     {
-        disconnectCount = disconnectCount > 0 ? disconnectCount : 0;
+        _disconnectCount = _disconnectCount > 0 ? _disconnectCount : 0;
     }
 
 protected:
@@ -184,26 +175,24 @@ private:
     DISABLE_DEFAULT_COPY(Result)
 
     DriverPtr        _drv;
-
     Transaction::Ptr _externalTransact;
     Transaction::Ptr _internalTransact;
     QByteArray       _stmtName;
-    SQLHANDLE hStmt = nullptr;
-
-    QSqlRecord recInfo;
-    int disconnectCount = 0;
+    SQLHANDLE        _stmt = nullptr;
+    QSqlRecord       _recInfo;
+    int              _disconnectCount = 0;
     QString          _preparedQuery;     // Содержит подготовленный запрос
 
-    friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
-    friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, const DriverPtr& p);
-    friend QSqlField detail::qMakeFieldInfo(const Result* p, int i );
-    friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
+    friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
+    friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE stmt, const DriverPtr&);
+    friend QSqlField detail::qMakeFieldInfo(const Result*, int i );
+    friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
 
-    friend void detail::qSqlWarning(const QString& message, const Result* odbc, const char* func, int line);
-    friend void detail::qSqlWarning(const QString& message, const Driver *odbc, const char* func, int line);
-    friend void detail::qSqlWarning(const QString& message, const SQLHANDLE hStmt, const char* func, int line);
+    friend void detail::qSqlWarning(const QString& message, const Result*, const char* func, int line);
+    friend void detail::qSqlWarning(const QString& message, const Driver*, const char* func, int line);
+    friend void detail::qSqlWarning(const QString& message, const SQLHANDLE stmt, const char* func, int line);
 
-    friend QString detail::qODBCWarn(const Result* odbc, int *nativeCode);
+    friend QString detail::qODBCWarn(const Result*, int* nativeCode);
 
     friend int resultSize(const QSqlQuery&, const DriverPtr&);
 };
@@ -252,14 +241,13 @@ public:
     // не дожидаясь окончания выполнения sql-запроса. После того как операция
     // будет  прервана - данным  подключением  уже нельзя  будет пользоваться,
     // его можно будет только закрыть.
-    void abortOperation(/*const SQLHANDLE hStmt*/);
+    void abortOperation(/*const SQLHANDLE stmt*/);
 
     // Возвращает TRUE если sql-операция была прервана
     bool operationIsAborted() const;
-    bool setConnectionOptions(const QString& connOpts);
 
-    SQLHANDLE hEnv = nullptr;
-    SQLHANDLE hDbc = nullptr;
+    SQLHANDLE _env = nullptr;
+    SQLHANDLE _dbc = nullptr;
 
 private:
     void setOpen(bool) override;
@@ -275,6 +263,9 @@ private:
     void captureTransactAddr(Transaction*);
     void releaseTransactAddr(Transaction*);
     bool transactAddrIsEqual(Transaction*);
+
+    // Установка дополнительных параметров строки подключения
+    bool setConnectionOptions(const QString& connOpts);
 
 private:
     Q_OBJECT
@@ -299,14 +290,14 @@ private:
     bool hasSQLFetchScroll = true;
     bool hasMultiResultSets = false;
 
-    friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
-    friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, const DriverPtr& p);
-    friend QSqlField detail::qMakeFieldInfo(const Result* p, int i );
-    friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE hStmt, int i, QString *errorMessage);
+    friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
+    friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE stmt, const DriverPtr&);
+    friend QSqlField detail::qMakeFieldInfo(const Result*, int i );
+    friend QSqlField detail::qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
 
-    friend void qSqlWarning(const QString& message, const Result* odbc, const char* func, int line);
-    friend void qSqlWarning(const QString& message, const Driver *odbc, const char* func, int line);
-    friend void qSqlWarning(const QString& message, const SQLHANDLE hStmt, const char* func, int line);
+    friend void qSqlWarning(const QString& message, const Result*, const char* func, int line);
+    friend void qSqlWarning(const QString& message, const Driver*, const char* func, int line);
+    friend void qSqlWarning(const QString& message, const SQLHANDLE stmt, const char* func, int line);
 
     //QMutex _stmtMutex;
 };
@@ -317,5 +308,5 @@ QSqlResult* createResult(const Transaction::Ptr&);
 
 int resultSize(const QSqlQuery&, const DriverPtr&);
 
-} // namespace postgres
+} // namespace mssql
 } // namespace db

@@ -34,6 +34,6 @@ Pool& pool()
     return ::safe_singleton<Pool, 0>();
 }
 
-} // namespace postgres
+} // namespace mssql
 } // namespace db
 
