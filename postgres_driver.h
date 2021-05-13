@@ -162,6 +162,11 @@ private:
     bool isSelectSql() const;
 
     void cleanup();
+
+    void setLastError1(const QString& msg, QSqlError::ErrorType,
+                       const char* func, int line);
+    void setLastError2(const QString& msg, QSqlError::ErrorType,
+                       const char* func, int line, const char* detail);
     bool checkError(const char* msg, QSqlError::ErrorType,
                     const PGresult*, const char* func, int line);
 

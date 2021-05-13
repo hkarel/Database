@@ -380,8 +380,8 @@ bool Transaction::begin(IsolationLevel isolationLevel, WritePolicy writePolicy)
     }
     if (_isActive)
     {
-        log_error_m << "Transaction already begun: "
-                    << addrToNumber(_drv->_connect) << "/" << _transactId;
+        log_error_m << log_format("Transaction already begun: %?/%?",
+                                  addrToNumber(_drv->_connect), _transactId);
         return false;
     }
 
@@ -417,10 +417,10 @@ bool Transaction::begin(IsolationLevel isolationLevel, WritePolicy writePolicy)
     ExecStatusType status = pqexecStatus(pgres);
     if (status != PGRES_COMMAND_OK)
     {
-        const char* err = PQerrorMessage(_drv->_connect);
+        const char* detail = PQerrorMessage(_drv->_connect);
         log_error_m << "Failed begin transaction"
                     << ". Connect: " << addrToNumber(_drv->_connect)
-                    << ". Detail: " << err;
+                    << ". " << detail;
 
         // Прерываем использование данного подключения
         _drv->abortOperation();
@@ -434,19 +434,19 @@ bool Transaction::begin(IsolationLevel isolationLevel, WritePolicy writePolicy)
         // Отладить
         break_point
 
-        const char* err = PQerrorMessage(_drv->_connect);
+        const char* detail = PQerrorMessage(_drv->_connect);
         log_error_m << "Failed get transaction id"
                     << ". Connect: " << addrToNumber(_drv->_connect)
-                    << ". Detail: " << err;
+                    << ". " << detail;
 
         pgres = pqexec(_drv->_connect, "ROLLBACK");
         status = pqexecStatus(pgres);
         if (status != PGRES_COMMAND_OK)
         {
-            err = PQerrorMessage(_drv->_connect);
+            detail = PQerrorMessage(_drv->_connect);
             log_error_m << "Failed rollback transaction"
                         << ". Connect: " << addrToNumber(_drv->_connect)
-                        << ". Detail: " << err;
+                        << ". " << detail;
         }
 
         // Прерываем использование данного подключения
@@ -458,8 +458,8 @@ bool Transaction::begin(IsolationLevel isolationLevel, WritePolicy writePolicy)
     _transactId = strtoull(val, nullptr, 10);
     _isActive = true;
 
-    log_debug2_m << "Transaction begin: "
-                 << addrToNumber(_drv->_connect) << "/" << _transactId;
+    log_debug2_m << log_format("Transaction begin: %?/%?",
+                               addrToNumber(_drv->_connect), _transactId);
     return true;
 }
 
@@ -500,18 +500,15 @@ bool Transaction::commit()
     ExecStatusType status = pqexecStatus(pgres);
     if (status != PGRES_COMMAND_OK)
     {
-        const char* err = PQerrorMessage(_drv->_connect);
-        log_error_m << "Failed commit transaction: "
-                    << addrToNumber(_drv->_connect) << "/" << _transactId
-                    << ". Detail: " << err;
-
+        const char* detail = PQerrorMessage(_drv->_connect);
+        log_error_m << log_format("Failed commit transaction: %?/%?. %?",
+                                  addrToNumber(_drv->_connect), _transactId, detail);
         _isActive = false;
         _transactId = -1;
         return false;
     }
-    log_debug2_m << "Transaction commit: "
-                 << addrToNumber(_drv->_connect) << "/" << _transactId;
-
+    log_debug2_m << log_format("Transaction commit: %?/%?",
+                               addrToNumber(_drv->_connect), _transactId);
     _isActive = false;
     _transactId = -1;
     return true;
@@ -548,18 +545,15 @@ bool Transaction::rollback()
     ExecStatusType status = pqexecStatus(result);
     if (status != PGRES_COMMAND_OK)
     {
-        const char* err = PQerrorMessage(_drv->_connect);
-        log_error_m << "Failed rollback transaction: "
-                    << addrToNumber(_drv->_connect) << "/" << _transactId
-                    << ". Detail: " << err;
-
+        const char* detail = PQerrorMessage(_drv->_connect);
+        log_error_m << log_format("Failed rollback transaction: %?/%?. %?",
+                                  addrToNumber(_drv->_connect), _transactId, detail);
         _isActive = false;
         _transactId = -1;
         return false;
     }
-    log_debug2_m << "Transaction rollback: "
-                 << addrToNumber(_drv->_connect) << "/" << _transactId;
-
+    log_debug2_m << log_format("Transaction rollback: %?/%?",
+                               addrToNumber(_drv->_connect), _transactId);
     _isActive = false;
     _transactId = -1;
     return true;
@@ -572,13 +566,16 @@ bool Transaction::isActive() const
 
 //---------------------------------- Result ----------------------------------
 
+// Выводит в лог сокращенное описание ошибки без идентификатора транзакции
+#define SET_LAST_ERROR1(MSG, ERR_TYPE) \
+    setLastError1(MSG, ERR_TYPE, __func__, __LINE__);
+
+// Выводит в лог детализированное описание ошибки с идентификатором транзакции
+#define SET_LAST_ERROR2(MSG, ERR_TYPE, DETAIL) \
+    setLastError2(MSG, ERR_TYPE, __func__, __LINE__, DETAIL);
+
 #define CHECK_ERROR(MSG, ERR_TYPE) \
     checkError(MSG, ERR_TYPE, pgres, __func__, __LINE__)
-
-#define SET_LAST_ERROR(MSG, ERR_TYPE) { \
-    setLastError(QSqlError("PostgresResult", MSG, ERR_TYPE, "1")); \
-    alog::logger().error(alog_line_location, "PostgresDrv") << MSG; \
-}
 
 #define PGR(CMD) PGresultPtr{CMD}
 
@@ -609,18 +606,34 @@ bool Result::isSelectSql() const
     return isSelect();
 }
 
+void Result::setLastError1(const QString& msg, QSqlError::ErrorType type,
+                           const char* func, int line)
+{
+    setLastError(QSqlError("PostgresResult", msg, type, "1"));
+    constexpr const char* file_name = alog::detail::file_name(__FILE__);
+    alog::logger().error(file_name, func, line, "PostgresDrv") << msg;
+}
+
+void Result::setLastError2(const QString& msg, QSqlError::ErrorType type,
+                           const char* func, int line, const char* detail)
+{
+    setLastError(QSqlError("PostgresResult", msg, type, "1"));
+    constexpr const char* file_name = alog::detail::file_name(__FILE__);
+    quint64 connectId = addrToNumber(_drv->_connect);
+    alog::Line logLine = alog::logger().error(file_name, func, line, "PostgresDrv")
+        << log_format("%?. Transact: %?/%?", msg, connectId, transactId());
+    if (detail)
+        logLine << ". " << detail;
+}
+
 bool Result::checkError(const char* msg, QSqlError::ErrorType type,
                         const PGresult* result, const char* func, int line)
 {
     int status = PQresultStatus(result);
     if (status == PGRES_FATAL_ERROR)
     {
-        const char* err = PQerrorMessage(_drv->_connect);
-        setLastError(QSqlError("PostgresResult", msg, type, "1"));
-        alog::logger().error(alog::detail::file_name(__FILE__), func, line, "PostgresDrv")
-            << msg
-            << ". Transact: " << addrToNumber(_drv->_connect) << "/" << transactId()
-            << ". Detail: "   << err;
+        const char* detail = PQerrorMessage(_drv->_connect);
+        setLastError2(msg, type, func, line, detail);
         return true;
     }
     return false;
@@ -673,7 +686,8 @@ bool Result::beginInternalTransact()
     if (!_internalTransact->begin())
     {
         // Детали сообщения об ошибке пишутся в лог внутри метода begin()
-        SET_LAST_ERROR("Failed begin internal transaction", QSqlError::TransactionError)
+        SET_LAST_ERROR1("Failed begin internal transaction",
+                        QSqlError::TransactionError)
         return false;
     }
     log_debug2_m << "Internal transaction begin";
@@ -701,7 +715,8 @@ bool Result::commitInternalTransact()
     if (!_internalTransact->commit())
     {
         // Детали сообщения об ошибке пишутся в лог внутри метода commit()
-        SET_LAST_ERROR("Failed commit internal transaction", QSqlError::TransactionError)
+        SET_LAST_ERROR1("Failed commit internal transaction",
+                        QSqlError::TransactionError)
         return false;
     }
     log_debug2_m << "Internal transaction commit";
@@ -729,7 +744,8 @@ bool Result::rollbackInternalTransact()
     if (!_internalTransact->rollback())
     {
         // Детали сообщения об ошибке пишутся в лог внутри метода rollback()
-        SET_LAST_ERROR("Failed rollback internal transaction", QSqlError::TransactionError)
+        SET_LAST_ERROR1("Failed rollback internal transaction",
+                        QSqlError::TransactionError)
         return false;
     }
     log_debug2_m << "Internal transaction rollback";
@@ -759,12 +775,12 @@ bool Result::prepare(const QString& query)
     }
     if (_drv->operationIsAborted())
     {
-        SET_LAST_ERROR("Sql-operation aborted", QSqlError::UnknownError)
+        SET_LAST_ERROR1("Sql-operation aborted", QSqlError::UnknownError)
         return false;
     }
     if (!_drv->isOpen() || _drv->isOpenError())
     {
-        SET_LAST_ERROR("Database not open", QSqlError::ConnectionError)
+        SET_LAST_ERROR1("Database not open", QSqlError::ConnectionError)
         return false;
     }
 
@@ -798,9 +814,8 @@ bool Result::prepare(const QString& query)
         sql.replace(" ,", ",");
         if (!sql.isEmpty() && (sql[0] == QChar(' ')))
             sql.remove(0, 1);
-        log_debug2_m << "Begin prepare query"
-                     << ". Transact: " << addrToNumber(_drv->_connect) << "/" << transactId()
-                     << ". " << sql;
+        log_debug2_m << log_format("Begin prepare query. Transact: %?/%?. %?",
+                                   addrToNumber(_drv->_connect), transactId(), sql);
     }
 
     PGresultPtr pgres;
@@ -815,7 +830,8 @@ bool Result::prepare(const QString& query)
     _stmtName = stmtName;
 
     pgres = PGR(PQdescribePrepared(_drv->_connect, _stmtName));
-    if (CHECK_ERROR("Could not get describe for prepared statement", QSqlError::StatementError))
+    if (CHECK_ERROR("Could not get describe for prepared statement",
+                    QSqlError::StatementError))
     {
         rollbackInternalTransact();
         return false;
@@ -830,8 +846,8 @@ bool Result::prepare(const QString& query)
 
     _preparedQuery = pgQuery;
 
-    log_debug2_m << "End prepare query"
-                 << ". Transact: " << addrToNumber(_drv->_connect) << "/" << transactId();
+    log_debug2_m << log_format("End prepare query. Transact: %?/%?",
+                               addrToNumber(_drv->_connect), transactId());
     return true;
 }
 
@@ -847,20 +863,20 @@ bool Result::exec()
     }
     if (_drv->operationIsAborted())
     {
-        SET_LAST_ERROR("Sql-operation aborted", QSqlError::UnknownError)
+        SET_LAST_ERROR1("Sql-operation aborted", QSqlError::UnknownError)
         return false;
     }
     if (!_drv->isOpen() || _drv->isOpenError())
     {
-        SET_LAST_ERROR("Database not open", QSqlError::ConnectionError)
+        SET_LAST_ERROR1("Database not open", QSqlError::ConnectionError)
         return false;
     }
 
     if (!beginInternalTransact())
         return false;
 
-    log_debug2_m << "Start exec query"
-                 << ". Transact: " << addrToNumber(_drv->_connect) << "/" << transactId();
+    log_debug2_m << log_format("Start exec query. Transact: %?/%?",
+                               addrToNumber(_drv->_connect), transactId());
 
     setActive(false);
     setAt(QSql::BeforeFirstRow);
@@ -880,13 +896,9 @@ bool Result::exec()
         }
         if (values.count() != nparams)
         {
-            QString msg = "Parameter mismatch, expected %1, got %2 parameters"
-                          ". Transact: %3/%4";
-            msg = msg.arg(nparams)
-                     .arg(values.count())
-                     .arg(addrToNumber(_drv->_connect))
-                     .arg(transactId());
-            SET_LAST_ERROR(msg, QSqlError::StatementError)
+            QString msg = "Parameter mismatch, expected %1, got %2 parameters";
+            msg = msg.arg(nparams).arg(values.count());
+            SET_LAST_ERROR2(msg, QSqlError::StatementError, 0)
             rollbackInternalTransact();
             return false;
         }
@@ -900,11 +912,8 @@ bool Result::exec()
 
             if (!val.isValid())
             {
-                QString msg = "Query param%1 is invalid. Transact: %2/%3";
-                msg = msg.arg(i)
-                         .arg(addrToNumber(_drv->_connect))
-                         .arg(transactId());
-                SET_LAST_ERROR(msg, QSqlError::StatementError)
+                QString msg = "Query param%1 is invalid";
+                SET_LAST_ERROR2(msg.arg(i), QSqlError::StatementError, 0)
                 rollbackInternalTransact();
                 return false;
             }
@@ -1052,11 +1061,8 @@ bool Result::exec()
                     }
                     else
                     {
-                        QString msg = "Query param%1 is not UUID type. Transact: %2/%3";
-                        msg = msg.arg(i)
-                                 .arg(addrToNumber(_drv->_connect))
-                                 .arg(transactId());
-                        SET_LAST_ERROR(msg, QSqlError::StatementError)
+                        QString msg = "Query param%1 is not UUID type";
+                        SET_LAST_ERROR2(msg.arg(i), QSqlError::StatementError, 0)
                         rollbackInternalTransact();
                         return false;
                     }
@@ -1072,12 +1078,8 @@ bool Result::exec()
                     if (!val.canConvert<QVector<qint32>>())
                     {
                         QString msg =
-                            "Query param%1 can't convert to Vector<PG_TYPE_INT32> type"
-                            ". Transact: %2/%3";
-                        msg = msg.arg(i)
-                                 .arg(addrToNumber(_drv->_connect))
-                                 .arg(transactId());
-                        SET_LAST_ERROR(msg, QSqlError::StatementError)
+                            "Query param%1 can't convert to Vector<PG_TYPE_INT32> type";
+                        SET_LAST_ERROR2(msg.arg(i), QSqlError::StatementError, 0)
                         rollbackInternalTransact();
                         return false;
                     }
@@ -1131,12 +1133,8 @@ bool Result::exec()
                     else
                     {
                         QString msg =
-                            "Query param%1 can't convert to Vector<PG_TYPE_UUID> type"
-                            ". Transact: %2/%3";
-                        msg = msg.arg(i)
-                                 .arg(addrToNumber(_drv->_connect))
-                                 .arg(transactId());
-                        SET_LAST_ERROR(msg, QSqlError::StatementError)
+                            "Query param%1 can't convert to Vector<PG_TYPE_UUID> type";
+                        SET_LAST_ERROR2(msg.arg(i), QSqlError::StatementError, 0)
                         rollbackInternalTransact();
                         return false;
                     }
@@ -1144,12 +1142,9 @@ bool Result::exec()
                 }
                 default:
                 {
-                    QString msg = "Query param%1, is unknown datatype: %2. Transact: %2/%3";
-                    msg = msg.arg(i)
-                             .arg(paramtype)
-                             .arg(addrToNumber(_drv->_connect))
-                             .arg(transactId());
-                    SET_LAST_ERROR(msg, QSqlError::StatementError)
+                    QString msg = "Query param%1, is unknown datatype: %2";
+                    msg = msg.arg(i).arg(paramtype);
+                    SET_LAST_ERROR2(msg, QSqlError::StatementError, 0)
                     rollbackInternalTransact();
                     return false;
                 }
@@ -1169,16 +1164,33 @@ bool Result::exec()
                                      params.paramFormats, // const int *paramFormats,
                                      1 ))                 // int resultFormat
         {
-            log_debug2_m <<  PQerrorMessage(_drv->_connect);
-            SET_LAST_ERROR("Failed call PQsendQueryPrepared()", QSqlError::UnknownError)
+            const char* detail = PQerrorMessage(_drv->_connect);
+            SET_LAST_ERROR2("Could not exec prepared statement",
+                            QSqlError::StatementError, detail)
             rollbackInternalTransact();
             return false;
         }
+
+        if (1 != PQsetSingleRowMode(_drv->_connect))
+        {
+            const char* detail = PQerrorMessage(_drv->_connect);
+            SET_LAST_ERROR2("Failed turn on single-row mode",
+                            QSqlError::UnknownError, detail)
+            rollbackInternalTransact();
+            return false;
+        }
+
+        // После удачных вызовов PQsendQueryPrepared() и PQsetSingleRowMode()
+        // вызов функции PQgetResult() будет фетчить данные по одной записи.
+        // Поэтому вызовы PQgetResult() нужно выполнять в Result::gotoNext()
+        // до тех пор пока функция PQgetResult() не вернет NULL
+
+        int nfields = PQnfields(_stmt);
+        init(nfields);
     }
     else
     {
         PGresultPtr pgres;
-
         pgres = PGR(PQexecPrepared(_drv->_connect, _stmtName,
                                    nparams,             // int nParams,
                                    params.paramValues,  // const char * const *paramValues,
@@ -1186,56 +1198,36 @@ bool Result::exec()
                                    params.paramFormats, // const int *paramFormats,
                                    1 ));
 
-        if (CHECK_ERROR("Could not prepare statement", QSqlError::StatementError))
+        if (CHECK_ERROR("Could not exec prepared statement", QSqlError::StatementError))
         {
             rollbackInternalTransact();
             return false;
         }
     }
-
-    if (isSelectSql())
-    {
-        if (1 != PQsetSingleRowMode(_drv->_connect))
-        {
-            SET_LAST_ERROR("Failed turn on single-row mode", QSqlError::UnknownError)
-            rollbackInternalTransact();
-            return false;
-        }
-    }
-
-    // После удачного вызова PQsendQueryPrepared() вызовы PQgetResult() буду
-    // фетчить данные по одной записи.  Поэтому  вызовы PQgetResult()  нужно
-    // выполнять в Result::gotoNext() до тех пор пока  функция  PQgetResult()
-    // не вернет NULL
 
     if (_drv->operationIsAborted())
     {
-        SET_LAST_ERROR("Sql-operation aborted", QSqlError::UnknownError)
+        SET_LAST_ERROR1("Sql-operation aborted", QSqlError::UnknownError)
         rollbackInternalTransact();
         return false;
     }
 
-    if (isSelectSql())
-    {
-        int nfields = PQnfields(_stmt);
-        init(nfields);
-    }
-
     quint64 transId = transactId();
+    quint64 connectId = addrToNumber(_drv->_connect);
 
     if (!isSelectSql())
         if (!commitInternalTransact())
         {
-            log_debug2_m << "Failed exec query"
-                         << ". Transact: " << addrToNumber(_drv->_connect) << "/" << transId;
+            log_debug2_m << log_format("Failed exec query. Transact: %?/%?",
+                                       connectId, transId);
             return false;
         }
 
     _numRowsAffected = 0;
     setActive(true);
 
-    log_debug2_m << "End exec query"
-                 << ". Transact: " << addrToNumber(_drv->_connect) << "/" << transId;
+    log_debug2_m << log_format("End exec query. Transact: %?/%?",
+                               connectId, transId);
     return true;
 }
 
@@ -1264,13 +1256,16 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
     if (status != PGRES_SINGLE_TUPLE)
     {
         log_error_m << "Tuples data not PGRES_SINGLE_TUPLE";
-        CHECK_ERROR("Failed fetch record", QSqlError::StatementError);
+        const char* detail = PQerrorMessage(_drv->_connect);
+        SET_LAST_ERROR2("Failed fetch record",
+                        QSqlError::StatementError, detail)
         setAt(QSql::AfterLastRow);
         return false;
     }
     if (1 != PQbinaryTuples(pgres))
     {
-        log_error_m << "Tuples data must be in binary format";
+        SET_LAST_ERROR1("Tuples data must be in binary format",
+                        QSqlError::StatementError);
         setAt(QSql::AfterLastRow);
         return false;
     }
@@ -1546,8 +1541,9 @@ QSqlRecord Result::record() const
     return rec;
 }
 
+#undef SET_LAST_ERROR1
+#undef SET_LAST_ERROR2
 #undef CHECK_ERROR
-#undef SET_LAST_ERROR
 #undef PGR
 
 //-------------------------------- Driver ------------------------------------
