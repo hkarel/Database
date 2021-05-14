@@ -31,7 +31,6 @@
 #include "shared/clife_base.h"
 #include "shared/clife_ptr.h"
 #include "shared/container_ptr.h"
-#include "shared/qt/quuidex.h"
 
 #include <QSqlError>
 #include <QSqlDriver>

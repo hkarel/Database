@@ -26,12 +26,11 @@
 #include "postgres_driver.h"
 
 #include "shared/break_point.h"
-#include "shared/prog_abort.h"
 #include "shared/safe_singleton.h"
 #include "shared/logger/logger.h"
 #include "shared/logger/format.h"
-#include "shared/qt/logger_operators.h"
 #include "shared/qt/quuidex.h"
+#include "shared/qt/logger_operators.h"
 #include "shared/thread/thread_utils.h"
 
 #include <QDateTime>
@@ -39,10 +38,8 @@
 #include <QVariant>
 #include <QSqlField>
 #include <QSqlIndex>
-#include <QVarLengthArray>
 #include <cstdlib>
 #include <utility>
-#include <functional>
 #include <byteswap.h>
 
 #define log_error_m   alog::logger().error   (alog_line_location, "PostgresDrv")
