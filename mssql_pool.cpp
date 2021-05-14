@@ -1,7 +1,7 @@
 /*****************************************************************************
   The MIT License
 
-  Copyright © 2019 Pavel Karelin (hkarel), <hkarel@yandex.ru>
+  Copyright © 2021 Egorov Vladimir, <egorov.vladimir.n@gmail.com>
 
   Permission is hereby granted, free of charge, to any person obtaining
   a copy of this software and associated documentation files (the
