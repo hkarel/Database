@@ -45,12 +45,12 @@
 #include "shared/defmac.h"
 #include "shared/clife_base.h"
 #include "shared/clife_ptr.h"
-#include "shared/qt/quuidex.h"
 
 #include <QSqlError>
 #include <QSqlDriver>
 #include <QSqlQuery>
 #include <QSqlResult>
+
 #include <ibase.h>
 #include <atomic>
 
