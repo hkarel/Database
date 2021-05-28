@@ -1570,71 +1570,10 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
 
 bool Result::reset(const QString& query)
 {
-    // Посмотреть обстоятельства вызова
-    break_point
-
-    setActive(false);
-    setAt(QSql::BeforeFirstRow);
-
-    // Always reallocate the statement handle - the statement attributes
-    // are not reset if SQLFreeStmt() is called which causes some problems.
-    SQLRETURN r;
-    if (_stmt && isStmtHandleValid())
-    {
-        r = SQLFreeHandle(SQL_HANDLE_STMT, _stmt);
-        if (r != SQL_SUCCESS)
-        {
-            PRINT_ERROR("QODBCResult::reset: Unable to free statement handle", this);
-            return false;
-        }
-    }
-    r  = SQLAllocHandle(SQL_HANDLE_STMT, _drv->_dbc, &_stmt);
-    if (r != SQL_SUCCESS)
-    {
-        PRINT_ERROR("QODBCResult::reset: Unable to allocate statement handle", this);
+    if (!prepare(query))
         return false;
-    }
 
-    if (isForwardOnly())
-    {
-        r = SQLSetStmtAttr(_stmt, SQL_ATTR_CURSOR_TYPE, (SQLPOINTER)SQL_CURSOR_FORWARD_ONLY, SQL_IS_UINTEGER);
-    }
-    else
-    {
-        r = SQLSetStmtAttr(_stmt, SQL_ATTR_CURSOR_TYPE, (SQLPOINTER)SQL_CURSOR_STATIC, SQL_IS_UINTEGER);
-    }
-    if (r != SQL_SUCCESS && r != SQL_SUCCESS_WITH_INFO)
-    {
-        setLastError(qMakeError("QODBCResult::reset: Unable to set 'SQL_CURSOR_STATIC' as statement attribute"
-            ". Please check your ODBC driver configuration", QSqlError::StatementError, this->_drv));
-        return false;
-    }
-
-    r = SQLExecDirectW(_stmt, toSQLTCHAR(query).data(), (SQLINTEGER) query.length());
-    if (r != SQL_SUCCESS && r != SQL_SUCCESS_WITH_INFO && r!= SQL_NO_DATA)
-    {
-        setLastError(qMakeError("QODBCResult: Unable to execute statement", QSqlError::StatementError, this->_drv));
-        return false;
-    }
-
-    SQLULEN isScrollable = 0;
-    r = SQLGetStmtAttr(_stmt, SQL_ATTR_CURSOR_SCROLLABLE, &isScrollable, SQL_IS_INTEGER, 0);
-    if(r == SQL_SUCCESS || r == SQL_SUCCESS_WITH_INFO)
-        setForwardOnly(isScrollable == SQL_NONSCROLLABLE);
-
-    SQLSMALLINT count = 0;
-    SQLNumResultCols(_stmt, &count);
-    if (count)
-    {
-        setSelect(true);
-    }
-    else
-    {
-        setSelect(false);
-    }
-    setActive(true);
-
-    return true;
+    return exec();
 }
 
 int Result::size()
