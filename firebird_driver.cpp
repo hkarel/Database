@@ -1198,6 +1198,9 @@ bool Result::exec()
             XSQLVAR& sqlVar = _inda->sqlvar[i];
             if (!sqlVar.sqldata)
             {
+                // TODO Сделать реализацию как в PG, выводить номер параметра,
+                //      откатывать транзакцию и завершать выполнение функции
+
                 // skip unknown datatypes
                 log_error_m << "FireBird unknown datatype"
                             << ". Transact: " << _drv->_ibase << "/" << *transact();
@@ -1342,14 +1345,22 @@ bool Result::exec()
                     break;
 
                 default:
+                {
+                    // TODO Сделать реализацию как в PG, выводить номер параметра,
+                    //      откатывать транзакцию и завершать выполнение функции
+
                     log_error_m << "Unknown datatype: " << (sqlVar.sqltype & ~1)
                                 << ". Transact: " << _drv->_ibase << "/" << *transact();
+                }
             }
         }
     }
 
     if (!ok)
     {
+        // TODO Сделать реализацию как в PG, выводить номер параметра,
+        //      откатывать транзакцию и завершать выполнение функции
+
         log_debug2_m << "Failed exec query"
                      << ". Transact: " << _drv->_ibase << "/" << *transact();
         return false;
