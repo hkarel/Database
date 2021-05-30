@@ -598,11 +598,6 @@ Result::~Result()
     cleanup();
 }
 
-bool Result::isSelectSql() const
-{
-    return isSelect();
-}
-
 void Result::setLastError1(const QString& msg, QSqlError::ErrorType type,
                            const char* func, int line)
 {
@@ -634,6 +629,11 @@ bool Result::checkError(const char* msg, QSqlError::ErrorType type,
         return true;
     }
     return false;
+}
+
+bool Result::isSelectSql() const
+{
+    return isSelect();
 }
 
 void Result::cleanup()

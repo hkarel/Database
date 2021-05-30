@@ -156,18 +156,18 @@ protected:
     int size2(const DriverPtr&) const;
 
 private:
-    // Возвращает TRUE если sql-выражение  является  SELECT-запросом  или если
-    // в sql-выражении вызывается хранимая процедура возвращающая набор данных.
-    bool isSelectSql() const;
-
-    void cleanup();
-
     void setLastError1(const QString& msg, QSqlError::ErrorType,
                        const char* func, int line);
     void setLastError2(const QString& msg, QSqlError::ErrorType,
                        const char* func, int line, const char* detail);
     bool checkError(const char* msg, QSqlError::ErrorType,
                     const PGresult*, const char* func, int line);
+
+    // Возвращает TRUE если sql-выражение  является  SELECT-запросом  или если
+    // в sql-выражении вызывается хранимая процедура возвращающая набор данных
+    bool isSelectSql() const;
+
+    void cleanup();
 
     bool beginInternalTransact();
     bool commitInternalTransact();
@@ -227,13 +227,13 @@ public:
 //    QSqlIndex   primaryIndex(const QString& tableName) const override;
 
     QString formatValue(const QSqlField& field, bool trimStrings) const override;
-    QString escapeIdentifier(const QString& identifier, IdentifierType type) const override;
+    QString escapeIdentifier(const QString& identifier, IdentifierType) const override;
 
     // Функция прерывает выполнение текущей sql-операции. Этой функцией нужно
     // пользоваться  когда  необходимо  экстренно  закрыть  подключение  к БД
     // не дожидаясь окончания выполнения sql-запроса. После того как операция
     // будет  прервана - данным  подключением  уже нельзя  будет пользоваться,
-    // его можно будет только закрыть.
+    // его можно будет только закрыть
     void abortOperation();
 
     // Возвращает TRUE если sql-операция была прервана
