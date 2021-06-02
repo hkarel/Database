@@ -50,15 +50,15 @@ class Result;
 class Driver;
 typedef clife_ptr<Driver> DriverPtr;
 
-QSqlField qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
-QSqlField qMakeFieldInfo(const SQLHANDLE stmt, const DriverPtr&);
-QSqlField qMakeFieldInfo(const Result* result, int i);
-QSqlField qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
+//QSqlField qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
+//QSqlField qMakeFieldInfo(const SQLHANDLE stmt, const DriverPtr&);
+//QSqlField qMakeFieldInfo(const Result* result, int i);
+//QSqlField qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
 
-QString qODBCWarn(const Result*, int* nativeCode);
-void qSqlWarning(const QString& message, const Result*, const char* func, int line);
-void qSqlWarning(const QString& message, const Driver*, const char* func, int line);
-void qSqlWarning(const QString& message, const SQLHANDLE stmt, const char* func, int line);
+//QString qODBCWarn(const Result*, int* nativeCode);
+//void qSqlWarning(const QString& message, const Result*, const char* func, int line);
+//void qSqlWarning(const QString& message, const Driver*, const char* func, int line);
+//void qSqlWarning(const QString& message, const SQLHANDLE stmt, const char* func, int line);
 
 class Result;
 class Driver;
@@ -84,12 +84,12 @@ public:
     bool begin(IsolationLevel = IsolationLevel::ReadCommitted);
     bool commit();
     bool rollback();
-    bool endTrans();
     bool isActive() const;
 
 private:
     Transaction(const DriverPtr&);
     DISABLE_DEFAULT_FUNC(Transaction)
+
     quint64 transactId() const {return _transactId;}
 
 private:
@@ -114,19 +114,8 @@ public:
     bool prepare(const QString& query) override;
     bool exec() override;
 
-public slots:
+private slots:
     void abortStatement();
-
-protected:
-
-//    /**
-//      Функция получает на входе буфер в виде строки, в которой содержатся
-//      данные в формате csv, и выполняет экспорт данных в таблицу.
-//      table - имя таблицы
-//      colums - список столбцов csv и таблицы
-//      buffer - буфер данных
-//    */
-//    bool copyInsert(const QString& table, const QList<QString>& columns, const QString& buffer);
 
 protected:
     bool gotoNext(SqlCachedResult::ValueCache& row, int rowIdx) override;
@@ -140,6 +129,14 @@ protected:
     int size2(const DriverPtr&) const;
 
 private:
+    void setLastError1(const QString& msg, QSqlError::ErrorType,
+                       const char* func, int line);
+    void setLastError2(const QString& msg, QSqlError::ErrorType,
+                       const char* func, int line, const QString& detail,
+                       int code);
+    bool checkError(const char* msg, QSqlError::ErrorType, SQLRETURN rc,
+                    const char* func, int line);
+
     // Возвращает TRUE если sql-выражение  является  SELECT-запросом  или если
     // в sql-выражении вызывается хранимая процедура возвращающая набор данных.
     bool isSelectSql() const;
@@ -159,30 +156,15 @@ private:
     DriverPtr        _drv;
     Transaction::Ptr _externalTransact;
     Transaction::Ptr _internalTransact;
-    QByteArray       _stmtName;
-    SQLHANDLE        _stmt = nullptr;
-    QString          _preparedQuery;     // Содержит подготовленный запрос
-
-    quint64 _numRowsAffected = {0};
-
-    friend QSqlField qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
-    friend QSqlField qMakeFieldInfo(const SQLHANDLE stmt, const DriverPtr&);
-    friend QSqlField qMakeFieldInfo(const Result* result, int i);
-    friend QSqlField qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
-
-    friend void qSqlWarning(const QString& message, const Result*, const char* func, int line);
-    friend void qSqlWarning(const QString& message, const Driver*, const char* func, int line);
-    friend void qSqlWarning(const QString& message, const SQLHANDLE stmt, const char* func, int line);
-
-    friend QString qODBCWarn(const Result*, int* nativeCode);
+    SQLHANDLE        _stmt = {nullptr};
+    QString          _preparedQuery;    // Содержит подготовленный запрос
+    int              _numRowsAffected = {-1};
 
     friend int resultSize(const QSqlQuery&, const DriverPtr&);
 };
 
 class Driver final : public QSqlDriver, public clife_base
 {
-signals:
-    void abortStatement();
 public:
     typedef DriverPtr Ptr;
     ~Driver();
@@ -216,17 +198,26 @@ public:
     bool hasFeature(DriverFeature f) const override;
 
     QString formatValue(const QSqlField& field, bool trimStrings) const override;
-    QString escapeIdentifier(const QString& identifier, IdentifierType type) const override;
+    QString escapeIdentifier(const QString& identifier, IdentifierType) const override;
 
     // Функция прерывает выполнение текущей sql-операции. Этой функцией нужно
     // пользоваться  когда  необходимо  экстренно  закрыть  подключение  к БД
     // не дожидаясь окончания выполнения sql-запроса. После того как операция
     // будет  прервана - данным  подключением  уже нельзя  будет пользоваться,
-    // его можно будет только закрыть.
-    void abortOperation(/*const SQLHANDLE stmt*/);
+    // его можно будет только закрыть
+    void abortOperation();
 
     // Возвращает TRUE если sql-операция была прервана
     bool operationIsAborted() const;
+
+    // Определяет формат приведения строковых данных (UTF8/UTF16) к типу QString.
+    // Если  wideChar = TRUE  будет выполняться приведение из UTF16, в противном
+    // случае из UTF8.  По  умолчанию  выполняется  приведение  из  UTF8
+    bool wideChar() const {return _wideChar;}
+    void setWideChar(bool val) {_wideChar = val;}
+
+signals:
+    void abortStatement();
 
 private:
     void setOpen(bool) override;
@@ -237,39 +228,26 @@ private:
 
     void setThreadId(pid_t threadId) {_threadId = threadId;}
 
-    SQLHANDLE _env = nullptr;
-    SQLHANDLE _dbc = nullptr;
-    QString _catalog;
-
     // Вспомогательные функции, используются для предотвращения одновременного
     // использования более чем одной транзакции с текущим подключением к БД
+    void captureTransactAddr(Transaction*);
+    void releaseTransactAddr(Transaction*);
+    bool transactAddrIsEqual(Transaction*);
 
     // Установка дополнительных параметров строки подключения
-    bool setConnectionOptions(const QString& connOpts);
+    // bool setConnectionOptions(const QString& connOpts);
 
 private:
     Q_OBJECT
     Driver();
     DISABLE_DEFAULT_COPY(Driver)
 
-    pid_t            _threadId = {0};
-
+    SQLHANDLE _env = {nullptr};
+    SQLHANDLE _connect = {nullptr};
+    pid_t     _threadId = {0};
+    quint64   _transactNumber = {0};
+    bool      _wideChar = {false};
     std::atomic_bool _operationIsAborted = {false};
-
-//    enum DefaultCase {Lower, Mixed, Upper, Sensitive};
-
-    const int datetimePrecision = 19;
-
-    friend QSqlField qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
-    friend QSqlField qMakeFieldInfo(const SQLHANDLE stmt, const DriverPtr&);
-    friend QSqlField qMakeFieldInfo(const Result* result, int i);
-    friend QSqlField qMakeFieldInfo(const SQLHANDLE stmt, int i, QString* errorMessage);
-
-    friend void qSqlWarning(const QString& message, const Result*, const char* func, int line);
-    friend void qSqlWarning(const QString& message, const Driver*, const char* func, int line);
-    friend void qSqlWarning(const QString& message, const SQLHANDLE stmt, const char* func, int line);
-
-    friend QString qODBCWarn(const Result*, int* nativeCode);
 
     friend class Result;
     friend class Transaction;
