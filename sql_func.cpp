@@ -187,75 +187,18 @@ QString insertOrUpdateStatementPG(const QString& tableName, const QString& field
         s = s + "=:" + s;
     }
     QString updateFields = list.join(',');
-    sql = sql.arg(tableName).arg(fields).arg(placeholders).arg(matching).arg(updateFields);
+    sql = sql.arg(tableName)
+             .arg(fields)
+             .arg(placeholders)
+             .arg(matching)
+             .arg(updateFields);
+
     return sql;
 }
 
-QString mergeRowStatementMS(const QString& tableNameTarget,
-                                  const QString& fields, const QVector<QString>& matching)
-{
-    QList<QString> fieldsArr = fields.split(',');
-
-    QString sql =
-        " MERGE %1 AS Target                  "
-        " USING (SELECT %2) AS Source         "
-        "    ON (%3)                          "
-        " WHEN MATCHED THEN UPDATE SET        "
-        "   %4                                "
-        " WHEN NOT MATCHED THEN INSERT VALUES "
-        " (                                   "
-        "   %5                                "
-        " );                                  ";
-
-    QString rowValues;
-
-    // :F_GUID as F_GUID
-    QStringList valuesHolders;
-    for(const QString& field : fieldsArr)
-    {
-        QString holder = field;
-        holder = holder.replace('[', ' ');
-        holder = holder.replace(']', ' ');
-        holder = holder.trimmed();
-        QString finalHolder = ":%1 as %2";
-        finalHolder = finalHolder.arg(holder).arg(holder);
-        valuesHolders.append(finalHolder);
-    }
-    QString valueFields = valuesHolders.join(',');
-
-    QStringList matchHolders;
-    for(const QString& match : matching)
-    {
-        QString holder = "Target.%1 = Source.%2";
-        holder = holder.arg(match).arg(match);
-        matchHolders.append(holder);
-    }
-    QString matchFields = matchHolders.join(',');
-
-    QStringList matchedHolders;
-    for(const QString& field : fieldsArr)
-    {
-        QString holder = "%1 = Source.%2";
-        holder = holder.arg(field).arg(field);
-        matchedHolders.append(holder);
-    }
-    QString matchedFields = matchedHolders.join(',');
-
-    QStringList notMatchedHolders;
-    for(const QString& field : fieldsArr)
-    {
-        QString holder = "Source.%1";
-        holder = holder.arg(field);
-        notMatchedHolders.append(holder);
-    }
-    QString notMatchedFields = notMatchedHolders.join(',');
-
-    sql = sql.arg(tableNameTarget).arg(valueFields).arg(matchFields).arg(matchedFields).arg(notMatchedFields);
-    return sql;
-}
-
-QString mergeRowStatementMS(const QString& tableNameTarget,
-                                  const QVector<QString>& fields, const QVector<QString>& matching)
+QString mergeRowStatementMS(const QString& tableName,
+                            const QList<QString>& fields,
+                            const QList<QString>& matching)
 {
     QString sql =
         " MERGE %1 AS Target                  "
@@ -268,7 +211,7 @@ QString mergeRowStatementMS(const QString& tableNameTarget,
         "   %5                                "
         " );                                  ";
 
-    QString rowValues;
+    //QString rowValues;
 
     // :F_GUID as F_GUID
     QStringList valuesHolders;
@@ -311,12 +254,26 @@ QString mergeRowStatementMS(const QString& tableNameTarget,
     }
     QString notMatchedFields = notMatchedHolders.join(',');
 
-    sql = sql.arg(tableNameTarget).arg(valueFields).arg(matchFields).arg(matchedFields).arg(notMatchedFields);
+    sql = sql.arg(tableName)
+             .arg(valueFields)
+             .arg(matchFields)
+             .arg(matchedFields)
+             .arg(notMatchedFields);
+
     return sql;
 }
 
-QString mergeTableStatementMS(const QString& tableNameTarget, const QString& tableNameSource,
-                                  const QVector<QString>& fields, const QVector<QString>& matching)
+QString mergeRowStatementMS(const QString& tableName,
+                            const QString& fields,
+                            const QString& matching)
+{
+    return mergeRowStatementMS(tableName, fields.split(','), matching.split(','));
+}
+
+QString mergeTableStatementMS(const QString& targetTableName,
+                              const QString& sourceTableName,
+                              const QList<QString>& fields,
+                              const QList<QString>& matching)
 {
     QString sql =
         " MERGE %1 AS Target                  "
@@ -330,7 +287,7 @@ QString mergeTableStatementMS(const QString& tableNameTarget, const QString& tab
         " );                                  ";
 
     QStringList matchHolders;
-    for(const QString& match : matching)
+    for(const QString& match: matching)
     {
         QString holder = "Target.%1 = Source.%2";
         holder = holder.arg(match).arg(match);
@@ -339,7 +296,7 @@ QString mergeTableStatementMS(const QString& tableNameTarget, const QString& tab
     QString matchFields = matchHolders.join(',');
 
     QStringList matchedHolders;
-    for(const QString& field : fields)
+    for (const QString& field : fields)
     {
         QString holder = "%1 = Source.%2";
         holder = holder.arg(field).arg(field);
@@ -348,7 +305,7 @@ QString mergeTableStatementMS(const QString& tableNameTarget, const QString& tab
     QString matchedFields = matchedHolders.join(',');
 
     QStringList notMatchedHolders;
-    for(const QString& field : fields)
+    for (const QString& field : fields)
     {
         QString holder = "Source.%1";
         holder = holder.arg(field);
@@ -356,11 +313,23 @@ QString mergeTableStatementMS(const QString& tableNameTarget, const QString& tab
     }
     QString notMatchedFields = notMatchedHolders.join(',');
 
-    sql = sql.arg(tableNameTarget).arg(tableNameSource).arg(matchFields).arg(matchedFields).arg(notMatchedFields);
+    sql = sql.arg(targetTableName)
+             .arg(sourceTableName)
+             .arg(matchFields)
+             .arg(matchedFields)
+             .arg(notMatchedFields);
+
     return sql;
 }
 
-
+QString mergeTableStatementMS(const QString& targetTableName,
+                              const QString& sourceTableName,
+                              const QString& fields,
+                              const QString& matching)
+{
+    return mergeTableStatementMS(targetTableName, sourceTableName,
+                                 fields.split(','), matching.split(','));
+}
 
 } // namespace sql
 

@@ -248,9 +248,14 @@ QString insertOrUpdateStatementPG(const QString& tableName, const QString& field
 //   Source.[f_bigint]
 //   Source.[f_binary]
 // );
+QString mergeRowStatementMS(const QString& tableName,
+                            const QList<QString>& fields,
+                            const QList<QString>& matching);
 
-QString mergeRowStatementMS(const QString& tableNameTarget,
-                                  const QVector<QString>& fields, const QVector<QString>& matching);
+QString mergeRowStatementMS(const QString& tableName,
+                            const QString& fields,
+                            const QString& matching);
+
 // Генерирует sql-запрос вида:
 // MERGE types_table_target AS Target
 // USING types_table_source AS Source
@@ -263,9 +268,16 @@ QString mergeRowStatementMS(const QString& tableNameTarget,
 //   Source.[f_bigint]
 //   Source.[f_binary]
 // );
+QString mergeTableStatementMS(const QString& targetTableName,
+                              const QString& sourceTableName,
+                              const QList<QString>& fields,
+                              const QList<QString>& matching);
 
-QString mergeTableStatementMS(const QString& tableNameTarget, const QString& tableNameSource,
-                                  const QVector<QString>& fields, const QVector<QString>& matching);
+QString mergeTableStatementMS(const QString& targetTableName,
+                              const QString& sourceTableName,
+                              const QString& fields,
+                              const QString& matching);
+
 } // namespace sql
 
 #define INSERT_INTO            insertIntoStatement
