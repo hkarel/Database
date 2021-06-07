@@ -1107,6 +1107,8 @@ bool Result::prepare(const QString& query)
         QString sql = query;
         static QRegExp reg {R"(\s{2,})"};
         sql.replace(reg, " ");
+        sql.replace("[ ", "[");
+        sql.replace(" ]", "]");
         sql.replace(" ,", ",");
         if (!sql.isEmpty() && (sql[0] == QChar(' ')))
             sql.remove(0, 1);
