@@ -36,4 +36,3 @@ Pool& pool()
 
 } // namespace postgres
 } // namespace db
-

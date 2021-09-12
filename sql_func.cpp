@@ -332,8 +332,3 @@ QString mergeTableStatementMS(const QString& targetTableName,
 }
 
 } // namespace sql
-
-
-
-
-
