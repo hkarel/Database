@@ -1157,6 +1157,7 @@ bool Result::exec()
     log_debug2_m << "Start exec query"
                  << ". Transact: " << _drv->_ibase << "/" << *transact();
 
+    int i = 0;
     bool ok = true;
     setActive(false);
     setAt(QSql::BeforeFirstRow);
@@ -1166,7 +1167,7 @@ bool Result::exec()
         const QVector<QVariant>& values = boundValues();
         if (alog::logger().level() == alog::Level::Debug2)
         {
-            for (int i = 0; i < values.count(); ++i)
+            for (i = 0; i < values.count(); ++i)
                 log_debug2_m << "Query param" << i << ": " << values[i];
         }
         if (values.count() != _inda->sqld)
@@ -1181,7 +1182,7 @@ bool Result::exec()
             rollbackInternalTransact();
             return false;
         }
-        for (int i = 0; i < values.count(); ++i)
+        for (i = 0; i < values.count(); ++i)
         {
             const QVariant& val = values[i];
             if (!val.isValid())
@@ -1198,13 +1199,13 @@ bool Result::exec()
             XSQLVAR& sqlVar = _inda->sqlvar[i];
             if (!sqlVar.sqldata)
             {
-                // TODO Сделать реализацию как в PG, выводить номер параметра,
-                //      откатывать транзакцию и завершать выполнение функции
-
-                // skip unknown datatypes
-                log_error_m << "FireBird unknown datatype"
-                            << ". Transact: " << _drv->_ibase << "/" << *transact();
-                continue;
+                QString msg = "Query param%1 is invalid. Transact: %2/%3";
+                msg = msg.arg(i)
+                         .arg(_drv->_ibase)
+                         .arg(*transact());
+                SET_LAST_ERROR(msg, QSqlError::StatementError)
+                rollbackInternalTransact();
+                return false;
             }
             if (sqlVar.sqltype & 1)
             {
@@ -1346,23 +1347,28 @@ bool Result::exec()
 
                 default:
                 {
-                    // TODO Сделать реализацию как в PG, выводить номер параметра,
-                    //      откатывать транзакцию и завершать выполнение функции
-
-                    log_error_m << "Unknown datatype: " << (sqlVar.sqltype & ~1)
-                                << ". Transact: " << _drv->_ibase << "/" << *transact();
+                    QString msg = "Query param%1, is unknown datatype: %2"
+                                  ". Transact: %3/%4";
+                    msg = msg.arg(i)
+                             .arg(int(sqlVar.sqltype & ~1))
+                             .arg(_drv->_ibase)
+                             .arg(*transact());
+                    SET_LAST_ERROR(msg, QSqlError::StatementError)
+                    rollbackInternalTransact();
+                    return false;
                 }
             }
         }
-    }
+    } // if (_inda)
 
     if (!ok)
     {
-        // TODO Сделать реализацию как в PG, выводить номер параметра,
-        //      откатывать транзакцию и завершать выполнение функции
-
-        log_debug2_m << "Failed exec query"
-                     << ". Transact: " << _drv->_ibase << "/" << *transact();
+        QString msg = "Query param%1 is invalid. Transact: %2/%3";
+        msg = msg.arg(i)
+                 .arg(_drv->_ibase)
+                 .arg(*transact());
+        SET_LAST_ERROR(msg, QSqlError::StatementError)
+        rollbackInternalTransact();
         return false;
     }
 
