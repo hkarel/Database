@@ -1052,7 +1052,7 @@ bool Result::prepare(const QString& query)
 
     ISC_STATUS status[20] = {0};
     isc_dsql_allocate_statement(status, _drv->ibase(), &_stmt);
-    if (CHECK_ERROR("Could not allocate statemen", QSqlError::StatementError))
+    if (CHECK_ERROR("Could not allocate statement", QSqlError::StatementError))
     {
         rollbackInternalTransact();
         return false;
