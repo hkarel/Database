@@ -1375,6 +1375,24 @@ bool Result::exec()
                             (*ind == SQL_NULL_DATA) ? ind : nullptr);
                     break;
                 }
+                case SQL_BIT: // [bit]
+                {
+                        bool v = val.toBool();
+                        params.paramValues[i] = (char*)malloc(sizeof(qint8));
+                        *((qint8*)params.paramValues[i]) = v;
+
+                        rc = SQLBindParameter(
+                                _stmt, i + 1,
+                                SQL_PARAM_INPUT/*qParamType[bindValueType(i) & QSql::InOut]*/,
+                                SQL_C_BIT,
+                                SQL_BIT,
+                                0,
+                                0,
+                                params.paramValues[i],
+                                0,
+                                (*ind == SQL_NULL_DATA) ? ind : nullptr);
+                        break;
+                }
                 case SQL_INTEGER: // [int]
                 {
                     qint32 v = val.toInt();
