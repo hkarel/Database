@@ -1222,11 +1222,9 @@ bool Result::exec()
         {
             const QVariant& val = values[i];
 
-            // TODO Разобтаться с записью NULL данных
-            if (val.isNull())
-                continue;
-
-            if (!val.isValid())
+            // Variant со значением Null всегда являются не валидным, поэтому
+            // валидность проверятся только для не Null значений
+            if (!val.isNull() && !val.isValid())
             {
                 QString msg = "Query param%1 is invalid";
                 SET_LAST_ERROR2(msg.arg(i), QSqlError::StatementError, {}, 0)
