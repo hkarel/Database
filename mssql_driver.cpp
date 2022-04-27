@@ -2286,6 +2286,38 @@ bool Driver::open(const QString& db,
             logLine << ", options: " << connOpts.trimmed();
     }
 
+    for (const QString& connOpt : connOpts.split(QChar(';'), QString::SkipEmptyParts))
+    {
+        QStringList option = connOpt.split(QChar('='));
+        if (option.size() != 2)
+            continue;
+
+        if (option[0].trimmed() == "Connection Timeout")
+        {
+            bool ok;
+            long timeout = option[1].toLong(&ok);
+            if (!ok)
+            {
+                QString msg = "Incorrect option 'Connection Timeout', param must be numeric";
+                DRIVER_PRINT_ERROR(msg, SQL_HANDLE_DBC, _connect)
+                setOpenError(true);
+                freeResources();
+                return false;
+            }
+
+            rc = SQLSetConnectAttrW(_connect, SQL_ATTR_LOGIN_TIMEOUT,
+                                    (SQLPOINTER)timeout, SQL_IS_INTEGER);
+            if (!SQL_SUCCEEDED(rc))
+            {
+                QString msg = "Failed set option 'Connection Timeout'";
+                DRIVER_PRINT_ERROR(msg, SQL_HANDLE_DBC, _connect)
+                setOpenError(true);
+                freeResources();
+                return false;
+            }
+        }
+    }
+
     SQLSMALLINT cb;
     QVarLengthArray<ushort> connOut {1024};
     memset(connOut.data(), 0, connOut.size() * sizeof(ushort));
