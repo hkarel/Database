@@ -58,7 +58,7 @@
 QT_BEGIN_NAMESPACE
 
 class QVariant;
-template <typename T> class QVector;
+//template <typename T> class QVector;
 
 class SqlCachedResultPrivate;
 

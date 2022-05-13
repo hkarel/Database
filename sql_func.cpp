@@ -25,6 +25,8 @@
 
 #include "sql_func.h"
 
+#include <QRegularExpression>
+
 namespace sql {
 
 QVariant bindVariant(bool val)
@@ -151,7 +153,7 @@ void assignValue(quint64& val, const QSqlRecord& rec, const QString& fieldName)
 
 QString fieldsToPlaceholders(QString fields)
 {
-    static QRegExp reg {R"(\s+)"};
+    static QRegularExpression reg {R"(\s+)"};
     fields.remove(reg);
     fields.replace(",", ", :");
     fields.prepend(":");

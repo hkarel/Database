@@ -36,7 +36,6 @@
 #include <QSqlQuery>
 #include <QSqlResult>
 
-
 #include <sqlext.h>
 #include <atomic>
 

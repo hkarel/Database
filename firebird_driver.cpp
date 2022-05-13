@@ -1040,7 +1040,7 @@ bool Result::prepare(const QString& query)
     if (alog::logger().level() == alog::Level::Debug2)
     {
         QString sql = query;
-        static QRegExp reg {R"(\s{2,})"};
+        static QRegularExpression reg {R"(\s{2,})"};
         sql.replace(reg, " ");
         sql.replace(" ,", ",");
         if (!sql.isEmpty() && (sql[0] == QChar(' ')))

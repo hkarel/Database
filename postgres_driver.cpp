@@ -34,7 +34,6 @@
 #include "shared/thread/thread_utils.h"
 
 #include <QDateTime>
-#include <QRegExp>
 #include <QVariant>
 #include <QSqlField>
 #include <QSqlIndex>
@@ -150,13 +149,13 @@ inline QDate baseDate() {return {2000, 01, 01};}
 
 qint64 toTimeStamp(const QDateTime& dt)
 {
-    static const qint64 baseMSecs {QDateTime{baseDate()}.toMSecsSinceEpoch()};
+    static const qint64 baseMSecs {QDateTime{baseDate(), QTime()}.toMSecsSinceEpoch()};
     return (dt.toMSecsSinceEpoch() - baseMSecs) * 1000;
 }
 
 QDateTime fromTimeStamp(qint64 ts)
 {
-    static const QDateTime basedate {baseDate()};
+    static const QDateTime basedate {baseDate(), QTime()};
     return basedate.addMSecs(ts / 1000);
 }
 
@@ -806,7 +805,7 @@ bool Result::prepare(const QString& query)
     if (alog::logger().level() == alog::Level::Debug2)
     {
         QString sql = pgQuery;
-        static QRegExp reg {R"(\s{2,})"};
+        static QRegularExpression reg {R"(\s{2,})"};
         sql.replace(reg, " ");
         sql.replace(" ,", ",");
         if (!sql.isEmpty() && (sql[0] == QChar(' ')))
