@@ -1320,7 +1320,7 @@ bool Result::exec()
                     QDateTime dt = val.toDateTime();
                     QDate d = dt.date();
                     QTime t = dt.time();
-
+ 
                     ts->year   = d.year();
                     ts->month  = d.month();
                     ts->day    = d.day();
@@ -1328,28 +1328,28 @@ bool Result::exec()
                     ts->minute = t.minute();
                     ts->second = t.second();
                     // (20 includes a separating period)
-                    const int precision = DATETIME_PRECISION - 20;
-                    if (precision <= 0)
-                    {
-                        ts->fraction = 0;
-                    }
-                    else
-                    {
-                        ts->fraction = t.msec() * 1000000;
+                    ts->fraction = t.msec() * 1000000;
 
-                        // (How many leading digits do we want to keep?  With SQL Server 2005, this should be 3: 123000000)
-                        int keep = (int)qPow(10.0, 9 - qMin(9, precision));
-                        ts->fraction = (ts->fraction / keep) * keep;
-                    }
+//                    if (precision <= 0)
+//                    {
+//                        ts->fraction = 0;
+//                    }
+//                    else
+//                    {
+//                        ts->fraction = t.msec() * 1000000;
+
+//                        // (How many leading digits do we want to keep?  With SQL Server 2005, this should be 3: 123000000)
+//                        int keep = (int)qPow(10.0, 9 - qMin(9, precision));
+//                        ts->fraction = (ts->fraction / keep) * keep;
+//                    }
 
                     rc = SQLBindParameter(
                             _stmt, i + 1,
                             SQL_PARAM_INPUT/*qParamType[bindValueType(i) & QSql::InOut]*/,
                             SQL_C_TIMESTAMP,
                             SQL_TIMESTAMP,
-                            DATETIME_PRECISION,
-                            //((TIMESTAMP_STRUCT*)ba.constData())->fraction,
-                            ts->fraction,
+                            bytesRemaining,
+                            decimalDigits,
                             params.paramValues[i],
                             0,
                             (*ind == SQL_NULL_DATA) ? ind : nullptr);
