@@ -48,25 +48,27 @@
 #define log_debug_m   alog::logger().debug   (alog_line_location, "PostgresDrv")
 #define log_debug2_m  alog::logger().debug2  (alog_line_location, "PostgresDrv")
 
-#define PG_TYPE_BOOL        16   // QBOOLOID
-#define PG_TYPE_INT8        18   // OINT1OID
-#define PG_TYPE_INT16       21   // QINT2OID
-#define PG_TYPE_INT32       23   // QINT4OID
-#define PG_TYPE_INT64       20   // QINT8OID
+#define PG_TYPE_BOOL         16   // QBOOLOID
+#define PG_TYPE_INT8         18   // OINT1OID
+#define PG_TYPE_INT16        21   // QINT2OID
+#define PG_TYPE_INT32        23   // QINT4OID
+#define PG_TYPE_INT64        20   // QINT8OID
 
-#define PG_TYPE_BYTEARRAY   17   // QBYTEARRAY (BINARY)
-#define PG_TYPE_STRING      25   // STRING (NOT BIN)
+#define PG_TYPE_BYTEARRAY    17   // QBYTEARRAY (BINARY)
+#define PG_TYPE_STRING       25   // STRING (NOT BIN)
 
-#define PG_TYPE_FLOAT       700  // QFLOAT4OID
-#define PG_TYPE_DOUBLE      701  // QFLOAT8OID
+#define PG_TYPE_FLOAT        700  // QFLOAT4OID
+#define PG_TYPE_DOUBLE       701  // QFLOAT8OID
 
-#define PG_TYPE_DATE        1082 // QDATEOID
-#define PG_TYPE_TIME        1083 // QTIMEOID
-#define PG_TYPE_TIMESTAMP   1114 // QTIMESTAMPOID
+#define PG_TYPE_DATE         1082 // QDATEOID
+#define PG_TYPE_TIME         1083 // QTIMEOID
+#define PG_TYPE_TIMESTAMP    1114 // QTIMESTAMPOID
 
-#define PG_TYPE_UUID        2950
-#define PG_TYPE_UUID_ARRAY  2951
-#define PG_TYPE_INT4_ARRAY  1007
+#define PG_TYPE_UUID         2950
+#define PG_TYPE_UUID_ARRAY   2951
+#define PG_TYPE_INT4_ARRAY   1007
+#define PG_TYPE_FLOAT_ARRAY  1021
+#define PG_TYPE_DOUBLE_ARRAY 1022
 
 namespace db {
 namespace postgres {
@@ -138,6 +140,12 @@ QVariant::Type qPostgresTypeName(int pgType)
 
         case PG_TYPE_INT4_ARRAY:
             return QVariant::Type(qMetaTypeId<QVector<qint32>>());
+
+        case PG_TYPE_FLOAT_ARRAY:
+            return QVariant::Type(qMetaTypeId<QVector<float>>());
+
+        case PG_TYPE_DOUBLE_ARRAY:
+            return QVariant::Type(qMetaTypeId<QVector<double>>());
 
         case PG_TYPE_UUID_ARRAY:
             return QVariant::Type(qMetaTypeId<QVector<QUuid>>());
@@ -1095,8 +1103,70 @@ bool Result::exec()
                     }
                     break;
                 }
+                case PG_TYPE_FLOAT_ARRAY:
+                {
+                    static_assert(sizeof(float) == sizeof(qint32),
+                                  "Size of float-type must be 4 byte");
+
+                    if (!val.canConvert<QVector<float>>())
+                    {
+                        QString msg =
+                            "Query param%1 can't convert to Vector<PG_TYPE_FLOAT_ARRAY> type";
+                        SET_LAST_ERROR2(msg.arg(i), QSqlError::StatementError, 0)
+                        rollbackInternalTransact();
+                        return false;
+                    }
+
+                    auto fillingFunc = [](qint32* ptrArray, QVector<float>& array)
+                    {
+                        for (const float item : array)
+                        {
+                            *ptrArray++ = bswap_32((qint32)sizeof(float));
+                            *ptrArray++ = bswap_32(*((qint32*) &item));
+                        }
+                    };
+                    if (!setArray<float>(PG_TYPE_FLOAT, "PG_TYPE_FLOAT", i, val, fillingFunc, params))
+                    {
+                        rollbackInternalTransact();
+                        return false;
+                    }
+                    break;
+                }
+                case PG_TYPE_DOUBLE_ARRAY:
+                {
+                    static_assert(sizeof(double) == sizeof(qint64),
+                                  "Size of double-type must be 8 byte");
+
+                    if (!val.canConvert<QVector<double>>())
+                    {
+                        QString msg =
+                            "Query param%1 can't convert to Vector<PG_TYPE_DOUBLE_ARRAY> type";
+                        SET_LAST_ERROR2(msg.arg(i), QSqlError::StatementError, 0)
+                        rollbackInternalTransact();
+                        return false;
+                    }
+
+                    auto fillingFunc = [](qint32* ptrArray, QVector<double>& array)
+                    {
+                        for (const double item : array)
+                        {
+                            *ptrArray++ = bswap_32((qint32)sizeof(double));
+                            *((qint64*)ptrArray) = bswap_64(*((qint64*) &item));
+                            ptrArray += 2;
+                        }
+                    };
+                    if (!setArray<double>(PG_TYPE_DOUBLE, "PG_TYPE_DOUBLE", i, val, fillingFunc, params))
+                    {
+                        rollbackInternalTransact();
+                        return false;
+                    }
+                    break;
+                }
                 case PG_TYPE_UUID_ARRAY:
                 {
+                    static_assert(sizeof(QUuid) == 16,
+                                  "Size of QUuid-type must be 16 byte");
+
                     auto fillingFunc = [](qint32* ptrArray, auto& array)
                     {
                         for (int i = 0; i < array.count(); ++i)
@@ -1393,6 +1463,47 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
                 row[idx].setValue(array);
                 break;
             }
+            case PG_TYPE_FLOAT_ARRAY:
+            {
+                QVector<float> array;
+                auto fillingFunc = [](qint32* ptrArray, QVector<float>& array)
+                {
+                    for (int i = 0; i < array.count(); ++i)
+                    {
+                        ++ptrArray; // Пропустить размер значения
+                        qint32 val = bswap_32(*ptrArray++);
+                        array[i] = *((float*) &val);
+                    }
+                };
+                if (!getArray<float>(pgres, PG_TYPE_FLOAT, "PG_TYPE_FLOAT", i, fillingFunc, array))
+                {
+                    setAt(QSql::AfterLastRow);
+                    return false;
+                }
+                row[idx].setValue(array);
+                break;
+            }
+            case PG_TYPE_DOUBLE_ARRAY:
+            {
+                QVector<double> array;
+                auto fillingFunc = [](qint32* ptrArray, QVector<double>& array)
+                {
+                    for (int i = 0; i < array.count(); ++i)
+                    {
+                        ++ptrArray; // Пропустить размер значения
+                        qint64 val = bswap_64(*(qint64*)ptrArray);
+                        array[i] = *((double*) &val);
+                        ptrArray += 2;
+                    }
+                };
+                if (!getArray<double>(pgres, PG_TYPE_DOUBLE, "PG_TYPE_DOUBLE", i, fillingFunc, array))
+                {
+                    setAt(QSql::AfterLastRow);
+                    return false;
+                }
+                row[idx].setValue(array);
+                break;
+            }
             case PG_TYPE_UUID_ARRAY:
             {
                 QVector<QUuid> array;
@@ -1404,7 +1515,7 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
                         const QUuid& uuid =
                             QUuid::fromRfc4122(QByteArray::fromRawData((char*)ptrArray, 16));
                         array[i] = uuid;
-                        ptrArray = ptrArray + 4;
+                        ptrArray += 4;
                     }
                 };
                 if (!getArray<QUuid>(pgres, PG_TYPE_UUID, "PG_TYPE_UUID", i, fillingFunc, array))
