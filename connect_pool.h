@@ -121,7 +121,7 @@ private:
 
     QList<typename Data::Ptr> _connectList;
 
-    template<typename T, int> friend T& ::safe_singleton();
+    template<typename T, int> friend T& safe::singleton();
 };
 
 template<typename DatabaseT>
