@@ -31,7 +31,7 @@ namespace postgres {
 
 Pool& pool()
 {
-    return ::safe_singleton<Pool, 0>();
+    return safe::singleton<Pool>();
 }
 
 } // namespace postgres
