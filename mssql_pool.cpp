@@ -31,7 +31,7 @@ namespace mssql {
 
 Pool& pool()
 {
-    return ::safe_singleton<Pool, 0>();
+    return safe::singleton<Pool, 0>();
 }
 
 } // namespace mssql
