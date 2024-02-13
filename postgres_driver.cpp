@@ -1,4 +1,4 @@
-/*****************************************************************************
+﻿/*****************************************************************************
   The MIT License
 
   Copyright © 2020 Pavel Karelin (hkarel), <hkarel@yandex.ru>
@@ -927,7 +927,7 @@ bool Result::exec()
                 if (uuid.isNull())
                     continue;
             }
-            else if (val.userType() == qMetaTypeId<QUuid>())
+            else if (val.type() == QVariant::Uuid)
             {
                 const QUuid& uuid = val.value<QUuid>();
                 if (uuid.isNull())
@@ -1058,7 +1058,7 @@ bool Result::exec()
                         const QUuidEx& uuid = val.value<QUuidEx>();
                         v = uuid.toRfc4122();
                     }
-                    else if (val.userType() == qMetaTypeId<QUuid>())
+                    else if (val.type() == QVariant::Uuid)
                     {
                         const QUuid& uuid = val.value<QUuid>();
                         v = uuid.toRfc4122();
