@@ -1512,16 +1512,23 @@ bool Result::exec()
                 }
                 case SQL_GUID: // [uniqueidentifier]
                 {
-                    QByteArray v;
+                    static_assert(sizeof(QUuid) == 16,
+                                  "Size of QUuid-type must be 16 byte");
+
+                    //QByteArray v;
+                    params.paramValues[i] = (char*)malloc(16);
+
                     if (val.userType() == qMetaTypeId<QUuidEx>())
                     {
                         const QUuidEx& uuid = val.value<QUuidEx>();
-                        v = uuid.toRfc4122();
+                        //v = uuid.toRfc4122();
+                        memcpy(params.paramValues[i], &uuid, 16);
                     }
-                    else if (val.userType() == qMetaTypeId<QUuid>())
+                    else if (val.type() == QVariant::Uuid)
                     {
                         const QUuid& uuid = val.value<QUuid>();
-                        v = uuid.toRfc4122();
+                        //v = uuid.toRfc4122();
+                        memcpy(params.paramValues[i], &uuid, 16);
                     }
                     else
                     {
@@ -1534,22 +1541,22 @@ bool Result::exec()
                     //qint32(bswap_32(*(qint32*)ba.data()));
                     //qint32(bswap_16(*(qint32*)ba.data()));
 
-                    params.paramValues[i] = (char*)malloc(v.length());
-                    memcpy(params.paramValues[i], v.constData(), v.length());
+                    //params.paramValues[i] = (char*)malloc(v.length());
+                    //memcpy(params.paramValues[i], v.constData(), v.length());
 
                     if (*ind != SQL_NULL_DATA)
-                        *ind = v.length();
+                        *ind = 16 /*v.length()*/;
 
                     rc = SQLBindParameter(
                             _stmt, i + 1,
                             SQL_PARAM_INPUT/*qParamType[bindValueType(i) & QSql::InOut]*/,
                             SQL_C_GUID,
                             SQL_GUID,
-                            v.length(),
+                            16 /*v.length()*/,
                             0,
                             params.paramValues[i],
-                            v.length(),
-                            ind);
+                            16 /*v.length()*/,
+                            (*ind == SQL_NULL_DATA) ? ind : nullptr);
                     break;
                 }
 
