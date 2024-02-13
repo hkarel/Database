@@ -1232,20 +1232,6 @@ bool Result::exec()
                 return false;
             }
 
-            // TODO Разобтаться с записью NULL данных
-            // else if (val.userType() == qMetaTypeId<QUuidEx>())
-            // {
-            //     const QUuidEx& uuid = val.value<QUuidEx>();
-            //     if (uuid.isNull())
-            //         continue;
-            // }
-            // else if (val.userType() == qMetaTypeId<QUuid>())
-            // {
-            //     const QUuid& uuid = val.value<QUuid>();
-            //     if (uuid.isNull())
-            //         continue;
-            // }
-
             SQLSMALLINT dataType, decimalDigits, nullable;
             SQLULEN bytesRemaining;
 
@@ -1266,7 +1252,6 @@ bool Result::exec()
 
             switch (dataType)
             {
-
                 case SQL_TYPE_DATE: // [date]
                 {
                     params.paramValues[i] = (char*)malloc(sizeof(DATE_STRUCT));
@@ -1311,8 +1296,10 @@ bool Result::exec()
                             (*ind == SQL_NULL_DATA) ? ind : nullptr);
                     break;
                 }
-                case SQL_TYPE_TIMESTAMP: // [datetime], [datetime2](7), [smalldatetime]
-                case SQL_SS_TIMESTAMPOFFSET: // [datetimeoffset](7)
+                case SQL_SS_TIMESTAMPOFFSET: // [datetimeoffset](точность 7)
+                case SQL_TYPE_TIMESTAMP:     // [datetime] (точность 3)
+                                             // [datetime2](точность 7),
+                                             // [smalldatetime] - не поддерживается
                 {
                     params.paramValues[i] = (char*)malloc(sizeof(TIMESTAMP_STRUCT));
                     TIMESTAMP_STRUCT* ts = (TIMESTAMP_STRUCT*)params.paramValues[i];
@@ -1327,21 +1314,21 @@ bool Result::exec()
                     ts->hour   = t.hour();
                     ts->minute = t.minute();
                     ts->second = t.second();
-                    // (20 includes a separating period)
-                    ts->fraction = t.msec() * 1000000;
+                    ts->fraction = 0; // decimalDigits == 3
 
-//                    if (precision <= 0)
-//                    {
-//                        ts->fraction = 0;
-//                    }
-//                    else
-//                    {
-//                        ts->fraction = t.msec() * 1000000;
+                    if (decimalDigits == 7)
+                        ts->fraction = t.msec() * 1000000;
 
-//                        // (How many leading digits do we want to keep?  With SQL Server 2005, this should be 3: 123000000)
-//                        int keep = (int)qPow(10.0, 9 - qMin(9, precision));
-//                        ts->fraction = (ts->fraction / keep) * keep;
-//                    }
+                    if ((decimalDigits != 3) && (decimalDigits != 7))
+                    {
+                        QString msg =
+                            "Query param%1, failed decimal digits length"
+                            ". For 'datetime' must be 3, for 'datetime2'"
+                            ", 'datetimeoffset' must be 7, other time-types not supported";
+                        SET_LAST_ERROR2(msg.arg(i), QSqlError::StatementError, {}, 0)
+                        rollbackInternalTransact();
+                        return false;
+                    }
 
                     rc = SQLBindParameter(
                             _stmt, i + 1,
@@ -1375,21 +1362,24 @@ bool Result::exec()
                 }
                 case SQL_BIT: // [bit]
                 {
-                        bool v = val.toBool();
-                        params.paramValues[i] = (char*)malloc(sizeof(qint8));
-                        *((qint8*)params.paramValues[i]) = v;
+                    // Отладить
+                    break_point
 
-                        rc = SQLBindParameter(
-                                _stmt, i + 1,
-                                SQL_PARAM_INPUT/*qParamType[bindValueType(i) & QSql::InOut]*/,
-                                SQL_C_BIT,
-                                SQL_BIT,
-                                0,
-                                0,
-                                params.paramValues[i],
-                                0,
-                                (*ind == SQL_NULL_DATA) ? ind : nullptr);
-                        break;
+                    bool v = val.toBool();
+                    params.paramValues[i] = (char*)malloc(sizeof(qint8));
+                    *((qint8*)params.paramValues[i]) = v;
+
+                    rc = SQLBindParameter(
+                            _stmt, i + 1,
+                            SQL_PARAM_INPUT/*qParamType[bindValueType(i) & QSql::InOut]*/,
+                            SQL_C_BIT,
+                            SQL_BIT,
+                            0,
+                            0,
+                            params.paramValues[i],
+                            0,
+                            (*ind == SQL_NULL_DATA) ? ind : nullptr);
+                    break;
                 }
                 case SQL_INTEGER: // [int]
                 {
@@ -1432,8 +1422,8 @@ bool Result::exec()
                 // case SQL_DECIMAL: // [decimal](18, 0)
                 // case SQL_NUMERIC: // [numeric](18, 0)
 
-                case SQL_REAL:    // [real]
-                case SQL_FLOAT:   // [float]
+                case SQL_REAL:  // [real]
+                case SQL_FLOAT: // [float]
                 {
                     float v = val.toDouble();
                     params.paramValues[i] = (char*)malloc(sizeof(float));
@@ -1451,7 +1441,7 @@ bool Result::exec()
                             (*ind == SQL_NULL_DATA) ? ind : nullptr);
                     break;
                 }
-                case SQL_DOUBLE:  // [double]
+                case SQL_DOUBLE: // [double]
                 {
                     double v = val.toDouble();
                     params.paramValues[i] = (char*)malloc(sizeof(double));
@@ -1512,23 +1502,21 @@ bool Result::exec()
                 }
                 case SQL_GUID: // [uniqueidentifier]
                 {
-                    static_assert(sizeof(QUuid) == 16,
+                    const int uuidLength = 16;
+                    static_assert(sizeof(QUuid) == uuidLength,
                                   "Size of QUuid-type must be 16 byte");
 
-                    //QByteArray v;
-                    params.paramValues[i] = (char*)malloc(16);
+                    params.paramValues[i] = (char*)malloc(uuidLength);
 
                     if (val.userType() == qMetaTypeId<QUuidEx>())
                     {
                         const QUuidEx& uuid = val.value<QUuidEx>();
-                        //v = uuid.toRfc4122();
-                        memcpy(params.paramValues[i], &uuid, 16);
+                        memcpy(params.paramValues[i], &uuid, uuidLength);
                     }
                     else if (val.type() == QVariant::Uuid)
                     {
                         const QUuid& uuid = val.value<QUuid>();
-                        //v = uuid.toRfc4122();
-                        memcpy(params.paramValues[i], &uuid, 16);
+                        memcpy(params.paramValues[i], &uuid, uuidLength);
                     }
                     else
                     {
@@ -1538,43 +1526,21 @@ bool Result::exec()
                         return false;
                     }
 
-                    //qint32(bswap_32(*(qint32*)ba.data()));
-                    //qint32(bswap_16(*(qint32*)ba.data()));
-
-                    //params.paramValues[i] = (char*)malloc(v.length());
-                    //memcpy(params.paramValues[i], v.constData(), v.length());
-
                     if (*ind != SQL_NULL_DATA)
-                        *ind = 16 /*v.length()*/;
+                        *ind = uuidLength;
 
                     rc = SQLBindParameter(
                             _stmt, i + 1,
                             SQL_PARAM_INPUT/*qParamType[bindValueType(i) & QSql::InOut]*/,
                             SQL_C_GUID,
                             SQL_GUID,
-                            16 /*v.length()*/,
+                            uuidLength,
                             0,
                             params.paramValues[i],
-                            16 /*v.length()*/,
-                            (*ind == SQL_NULL_DATA) ? ind : nullptr);
+                            uuidLength, // ???
+                            ind);
                     break;
                 }
-
-                // TODO Непонятен размер поля. Может отрезать?
-                // case SQL_BIT: //[bit]
-                // {
-                //     rc = SQLBindParameter(_stmt,
-                //                           i + 1,
-                //                           qParamType[bindValueType(i) & QSql::InOut],
-                //                           SQL_C_BIT,
-                //                           SQL_BIT,
-                //                           0,
-                //                           0,
-                //                           (void*)val.constData(),
-                //                           0,
-                //                           (*ind == SQL_NULL_DATA) ? ind : nullptr);
-                //     break;
-                // }
 
                 case SQL_WCHAR:    // [nchar](n)
                 case SQL_WVARCHAR: // [nvarchar](n), [nvarchar](max)
@@ -1593,9 +1559,10 @@ bool Result::exec()
                     }
                     else
                     {
-                        strSize = str.length() * sizeof(char);
+                        QByteArray strData = str.toUtf8();
+                        strSize = strData.length() * sizeof(char);
                         params.paramValues[i] = (char*)malloc(strSize);
-                        memcpy(params.paramValues[i], str.toUtf8().constData(), strSize);
+                        memcpy(params.paramValues[i], strData.constData(), strSize);
                     }
 
                     if (*ind != SQL_NULL_DATA)
@@ -1635,7 +1602,6 @@ bool Result::exec()
                     SET_LAST_ERROR2(msg, QSqlError::StatementError, {}, 0)
                     rollbackInternalTransact();
                     return false;
-
                 }
             }
 
