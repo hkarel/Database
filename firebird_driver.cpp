@@ -1231,7 +1231,7 @@ bool Result::exec()
                         continue;
                     }
                 }
-                else if (val.userType() == qMetaTypeId<QUuid>())
+                else if (val.type() == QVariant::Uuid)
                 {
                     const QUuid& uuid = val.value<QUuid>();
                     if (uuid.isNull())
@@ -1320,7 +1320,7 @@ bool Result::exec()
                             const QUuidEx& uuid = val.value<QUuidEx>();
                             ba = uuid.toRfc4122();
                         }
-                        else if (val.userType() == qMetaTypeId<QUuid>())
+                        else if (val.type() == QVariant::Uuid)
                         {
                             const QUuid& uuid = val.value<QUuid>();
                             ba = uuid.toRfc4122();
