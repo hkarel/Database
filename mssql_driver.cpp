@@ -1482,21 +1482,32 @@ bool Result::exec()
                 case SQL_LONGVARBINARY: // !
                 {
                     QByteArray v = val.toByteArray();
-                    params.paramValues[i] = (char*)malloc(v.length());
-                    memcpy(params.paramValues[i], v.constData(), v.length());
+                    int vlength = v.length();
+
+                    if (vlength == 0)
+                        *ind = SQL_NULL_DATA;
 
                     if (*ind != SQL_NULL_DATA)
-                        *ind = v.length();
+                    {
+                        *ind = vlength;
+                        params.paramValues[i] = (char*)malloc(vlength);
+                        memcpy(params.paramValues[i], v.constData(), vlength);
+                    }
+                    else
+                    {
+                        vlength = 1;
+                        params.paramValues[i] = (char*)malloc(vlength);
+                    }
 
                     rc = SQLBindParameter(
                             _stmt, i + 1,
                             SQL_PARAM_INPUT/*qParamType[bindValueType(i) & QSql::InOut]*/,
                             SQL_C_BINARY,
                             SQL_LONGVARBINARY,
-                            v.length(),
+                            vlength,
                             0,
                             params.paramValues[i],
-                            v.length(), // ??? зачем тут длина
+                            vlength, // ??? зачем тут длина
                             ind);
                     break;
                 }
