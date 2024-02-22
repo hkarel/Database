@@ -82,6 +82,29 @@ void assignValue(bool& val, const QSqlRecord& rec, const QString& fieldName)
         val = f.value().value<int>();
 }
 
+void assignValue(qint8& val, const QSqlRecord& rec, const QString& fieldName)
+{
+    const QSqlField& f = rec.field(fieldName.trimmed());
+    if (f.isNull() || !f.isValid())
+        return;
+
+    if (f.value().canConvert<int>())
+        val = qint8(f.value().value<int>());
+}
+
+void assignValue(quint8& val, const QSqlRecord& rec, const QString& fieldName)
+{
+    const QSqlField& f = rec.field(fieldName.trimmed());
+    if (f.isNull() || !f.isValid())
+        return;
+
+    if (f.value().canConvert<int>())
+    {
+        qint8 v = qint8(f.value().value<int>());
+        val = *((quint8*) &v);
+    }
+}
+
 void assignValue(qint16& val, const QSqlRecord& rec, const QString& fieldName)
 {
     const QSqlField& f = rec.field(fieldName.trimmed());
@@ -149,6 +172,16 @@ void assignValue(quint64& val, const QSqlRecord& rec, const QString& fieldName)
         qint64 v = f.value().value<qint64>();
         val = *((quint64*) &v);
     }
+}
+
+void assignValue(float& val, const QSqlRecord& rec, const QString& fieldName)
+{
+    const QSqlField& f = rec.field(fieldName.trimmed());
+    if (f.isNull() || !f.isValid())
+        return;
+
+    if (f.value().canConvert<float>())
+        val = f.value().value<float>();
 }
 
 QString fieldsToPlaceholders(QString fields)

@@ -122,12 +122,15 @@ void addBindValue(QSqlQuery& q, const T& t, const Args&... args)
 }
 
 void assignValue(bool&,    const QSqlRecord&, const QString& fieldName);
+void assignValue(qint8&,   const QSqlRecord&, const QString& fieldName);
+void assignValue(quint8&,  const QSqlRecord&, const QString& fieldName);
 void assignValue(qint16&,  const QSqlRecord&, const QString& fieldName);
 void assignValue(quint16&, const QSqlRecord&, const QString& fieldName);
 void assignValue(qint32&,  const QSqlRecord&, const QString& fieldName);
 void assignValue(quint32&, const QSqlRecord&, const QString& fieldName);
 void assignValue(qint64&,  const QSqlRecord&, const QString& fieldName);
 void assignValue(quint64&, const QSqlRecord&, const QString& fieldName);
+void assignValue(float&,   const QSqlRecord&, const QString& fieldName);
 
 template<typename T>
 void assignValue(T& val, const QSqlRecord& rec, const QString& fieldName,
