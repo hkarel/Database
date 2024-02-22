@@ -203,7 +203,7 @@ void assignValue(QVector<T>& val, const QSqlRecord& rec, const QString& fieldNam
         QVector<qint32> arr = field.value().value<QVector<qint32>>();
         val.resize(arr.count());
 
-        for(int i = 0; i < arr.count(); ++i)
+        for (int i = 0; i < arr.count(); ++i)
         {
             quint32 v = *((quint32*) &arr[i]);
             val[i] = static_cast<T>(v);
@@ -251,12 +251,10 @@ QString insertOrUpdateStatementPG(const QString& tableName, const QString& field
 //   Source.[f_bigint]
 //   Source.[f_binary]
 // );
-QString mergeRowStatementMS(const QString& tableName,
-                            const QList<QString>& fields,
-                            const QList<QString>& matching);
+QString mergeRowStatementMS(const QString& tableName, QStringList fields,
+                            QStringList matching);
 
-QString mergeRowStatementMS(const QString& tableName,
-                            const QString& fields,
+QString mergeRowStatementMS(const QString& tableName, const QString& fields,
                             const QString& matching);
 
 // Генерирует sql-запрос вида:
@@ -273,13 +271,11 @@ QString mergeRowStatementMS(const QString& tableName,
 // );
 QString mergeTableStatementMS(const QString& targetTableName,
                               const QString& sourceTableName,
-                              const QList<QString>& fields,
-                              const QList<QString>& matching);
+                              QStringList fields, QStringList matching);
 
 QString mergeTableStatementMS(const QString& targetTableName,
                               const QString& sourceTableName,
-                              const QString& fields,
-                              const QString& matching);
+                              const QString& fields, const QString& matching);
 
 } // namespace sql
 
