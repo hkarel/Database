@@ -442,7 +442,7 @@ char* readArrayBuffer(QList<QVariant>& list, char* buffer, short curDim,
                 break;
 
             case blr_timestamp:
-                for(int i = 0; i < numElements[dim]; ++i)
+                for (int i = 0; i < numElements[dim]; ++i)
                 {
                     valList.append(fromTimeStamp(buffer));
                     buffer += sizeof(ISC_TIMESTAMP);
@@ -450,7 +450,7 @@ char* readArrayBuffer(QList<QVariant>& list, char* buffer, short curDim,
                 break;
 
             case blr_sql_time:
-                for(int i = 0; i < numElements[dim]; ++i)
+                for (int i = 0; i < numElements[dim]; ++i)
                 {
                     valList.append(fromTime(buffer));
                     buffer += sizeof(ISC_TIME);
@@ -458,7 +458,7 @@ char* readArrayBuffer(QList<QVariant>& list, char* buffer, short curDim,
                 break;
 
             case blr_sql_date:
-                for(int i = 0; i < numElements[dim]; ++i)
+                for (int i = 0; i < numElements[dim]; ++i)
                 {
                     valList.append(fromDate(buffer));
                     buffer += sizeof(ISC_DATE);
@@ -1586,7 +1586,7 @@ bool Result::writeArray(XSQLVAR& sqlVar, const QList<QVariant>& list)
     ISC_LONG bufLen;
 
     short dimensions = desc.array_desc_dimensions;
-    for(int i = 0; i < dimensions; ++i)
+    for (int i = 0; i < dimensions; ++i)
     {
         arraySize *= (desc.array_desc_bounds[i].array_bound_upper -
                       desc.array_desc_bounds[i].array_bound_lower + 1);
@@ -1873,7 +1873,7 @@ int Result::size()
         isc_dsql_sql_info(_status,& _stmt, sizeof(sizeInfo), sizeInfo, sizeof(buf), buf);
 //        isc_database_info(_status,& d->ibase, sizeof(sizeInfo), sizeInfo, sizeof(buf), buf);
 
-        for(int i = 0; i < 66; ++i)
+        for (int i = 0; i < 66; ++i)
             qDebug() << QString::number(buf[i]);
 
         for (char* c = buf + 3;* c != isc_info_end; /*nothing*/) {
