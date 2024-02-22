@@ -1517,17 +1517,14 @@ bool Result::exec()
                     static_assert(sizeof(QUuid) == uuidLength,
                                   "Size of QUuid-type must be 16 byte");
 
-                    params.paramValues[i] = (char*)malloc(uuidLength);
-
+                    QUuidEx uuid;
                     if (val.userType() == qMetaTypeId<QUuidEx>())
                     {
-                        const QUuidEx& uuid = val.value<QUuidEx>();
-                        memcpy(params.paramValues[i], &uuid, uuidLength);
+                        uuid = val.value<QUuidEx>();
                     }
                     else if (val.type() == QVariant::Uuid)
                     {
-                        const QUuid& uuid = val.value<QUuid>();
-                        memcpy(params.paramValues[i], &uuid, uuidLength);
+                        uuid = val.value<QUuid>();
                     }
                     else
                     {
@@ -1536,6 +1533,12 @@ bool Result::exec()
                         rollbackInternalTransact();
                         return false;
                     }
+
+                    params.paramValues[i] = (char*)malloc(uuidLength);
+                    memcpy(params.paramValues[i], &uuid, uuidLength);
+
+                    if (uuid.isNull())
+                        *ind = SQL_NULL_DATA;
 
                     if (*ind != SQL_NULL_DATA)
                         *ind = uuidLength;
