@@ -1360,11 +1360,8 @@ bool Result::exec()
                             (*ind == SQL_NULL_DATA) ? ind : nullptr);
                     break;
                 }
-                case SQL_BIT: // [bit]
+                case SQL_BIT: // [bit] аналог типа BOOL
                 {
-                    // Отладить
-                    break_point
-
                     bool v = val.toBool();
                     params.paramValues[i] = (char*)malloc(sizeof(qint8));
                     *((qint8*)params.paramValues[i]) = v;
