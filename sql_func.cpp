@@ -235,15 +235,10 @@ QString mergeRowStatementMS(const QString& tableName, QStringList fields,
                             QStringList matching)
 {
     QString sql =
-        " MERGE %1 AS Target                  "
-        " USING (SELECT %2) AS Source         "
-        "   ON (%3)                           "
-        " WHEN MATCHED THEN UPDATE SET        "
-        "   %4                                "
-        " WHEN NOT MATCHED THEN INSERT VALUES "
-        " (                                   "
-        "   %5                                "
-        " );                                  ";
+        " MERGE %1 AS Target                             "
+        " USING (SELECT %2) AS Source ON (%3)            "
+        " WHEN MATCHED THEN UPDATE SET  %4               "
+        " WHEN NOT MATCHED THEN INSERT (%5) VALUES (%6); ";
 
     for (QString& field : fields)
         field = field.trimmed();
@@ -251,12 +246,12 @@ QString mergeRowStatementMS(const QString& tableName, QStringList fields,
     for (QString& match : matching)
         match = match.trimmed();
 
-    // :F_GUID as F_GUID
+    // :F_GUID as [F_GUID]
     QStringList valuesHolders;
     for (const QString& field : fields)
     {
         QString holder = field;
-        holder = holder.replace('[', ' ');// TODO: remove
+        holder = holder.replace('[', ' '); // TODO: remove ???
         holder = holder.replace(']', ' ');
         holder = holder.trimmed();
         QString finalHolder = ":%1 as %2";
@@ -296,6 +291,7 @@ QString mergeRowStatementMS(const QString& tableName, QStringList fields,
              .arg(valueFields)
              .arg(matchFields)
              .arg(matchedFields)
+             .arg(fields.join(','))
              .arg(notMatchedFields);
 
     return sql;
@@ -312,15 +308,10 @@ QString mergeTableStatementMS(const QString& targetTableName,
                               QStringList fields, QStringList matching)
 {
     QString sql =
-        " MERGE %1 AS Target                  "
-        " USING %2 AS Source                  "
-        "   ON (%3)                           "
-        " WHEN MATCHED THEN UPDATE SET        "
-        "   %4                                "
-        " WHEN NOT MATCHED THEN INSERT VALUES "
-        " (                                   "
-        "   %5                                "
-        " );                                  ";
+        " MERGE %1 AS Target                             "
+        " USING %2 AS Source ON (%3)                     "
+        " WHEN MATCHED THEN UPDATE SET  %4               "
+        " WHEN NOT MATCHED THEN INSERT (%5) VALUES (%6); ";
 
     for (QString& field : fields)
         field = field.trimmed();
@@ -359,6 +350,7 @@ QString mergeTableStatementMS(const QString& targetTableName,
              .arg(sourceTableName)
              .arg(matchFields)
              .arg(matchedFields)
+             .arg(fields.join(','))
              .arg(notMatchedFields);
 
     return sql;
