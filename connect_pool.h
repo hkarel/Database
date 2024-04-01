@@ -72,6 +72,9 @@ public:
     // ваться defaultTimeout
     typename DatabaseT::Ptr connect(int timeout = 0);
 
+    // Явно удаляет неиспользуемые подключения к БД
+    void removeUnusedConnects();
+
     // Определяет режим создания нового подключения к базе данных в одном потоке
     // исполнения. Если параметр равен TRUE, то в одном потоке исполнения будет
     // создаваться только одно подключение к БД.
@@ -114,7 +117,7 @@ private:
         int timeout = {DEFAULT_TIMEOUT};
     };
 
-    QMutex _poolLock;
+    QMutex _poolLock {QMutex::Recursive};
     InitFunc _initFunc;
     bool _singleConnect = {false};
     int _defaultTimeout = {DEFAULT_TIMEOUT};
@@ -248,6 +251,21 @@ typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect(int timeout)
         }
 
     // Удаляем неиспользуемые коннекты
+    removeUnusedConnects();
+
+    if (driver && !driver->isOpen())
+    {
+        if (_initFunc == nullptr || !_initFunc(driver))
+            driver->abortOperation();
+    }
+    return driver;
+}
+
+template<typename DatabaseT>
+void ConnectPool<DatabaseT>::removeUnusedConnects()
+{
+    QMutexLocker locker {&_poolLock}; (void) locker;
+
     for (int i = 0; i < _connectList.count(); ++i)
     {
         const typename Data::Ptr& d = _connectList[i];
@@ -261,13 +279,6 @@ typename DatabaseT::Ptr ConnectPool<DatabaseT>::connect(int timeout)
             _connectList.removeAt(i--);
         }
     }
-
-    if (driver && !driver->isOpen())
-    {
-        if (_initFunc == nullptr || !_initFunc(driver))
-            driver->abortOperation();
-    }
-    return driver;
 }
 
 template<typename DatabaseT>
