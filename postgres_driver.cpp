@@ -63,6 +63,7 @@
 #define PG_TYPE_DATE         1082 // QDATEOID
 #define PG_TYPE_TIME         1083 // QTIMEOID
 #define PG_TYPE_TIMESTAMP    1114 // QTIMESTAMPOID
+#define PG_TYPE_TIMESTAMPTZ  1184 // QTIMESTAMPTZOID
 
 #define PG_TYPE_UUID         2950
 #define PG_TYPE_UUID_ARRAY   2951
@@ -129,6 +130,9 @@ QVariant::Type qPostgresTypeName(int pgType)
         case PG_TYPE_TIMESTAMP:
             return QVariant::DateTime;
 
+        case PG_TYPE_TIMESTAMPTZ:
+            return QVariant::DateTime;
+
         case PG_TYPE_BYTEARRAY:
             return QVariant::ByteArray;
 
@@ -155,15 +159,34 @@ QVariant::Type qPostgresTypeName(int pgType)
 
 inline QDate baseDate() {return {2000, 01, 01};}
 
+inline QDateTime baseDateTimeUtc()
+{
+    QDateTime baseDt = {baseDate(), QTime()};
+    baseDt.setOffsetFromUtc(0);
+    return baseDt;
+}
+
 qint64 toTimeStamp(const QDateTime& dt)
 {
     static const qint64 baseMSecs {QDateTime{baseDate(), QTime()}.toMSecsSinceEpoch()};
     return (dt.toMSecsSinceEpoch() - baseMSecs) * 1000;
 }
 
+qint64 toTimeStampUtc(const QDateTime& dt)
+{
+    static const qint64 baseMSecs {baseDateTimeUtc().toMSecsSinceEpoch()};
+    return (dt.toMSecsSinceEpoch() - baseMSecs) * 1000;
+}
+
 QDateTime fromTimeStamp(qint64 ts)
 {
     static const QDateTime basedate {baseDate(), QTime()};
+    return basedate.addMSecs(ts / 1000);
+}
+
+QDateTime fromTimeStampUtc(qint64 ts)
+{
+    static const QDateTime basedate {baseDateTimeUtc()};
     return basedate.addMSecs(ts / 1000);
 }
 
@@ -1050,6 +1073,15 @@ bool Result::exec()
                     *((qint64*)params.paramValues[i]) = bswap_64(v);
                     break;
                 }
+                case PG_TYPE_TIMESTAMPTZ:
+                {
+                    qint64 v = toTimeStampUtc(val.toDateTime());
+                    int sz = sizeof(v);
+                    params.paramValues[i] = (char*)malloc(sz);
+                    params.paramLengths[i] = sz;
+                    *((qint64*)params.paramValues[i]) = bswap_64(v);
+                    break;
+                }
                 case PG_TYPE_UUID:
                 {
                     QByteArray v;
@@ -1409,6 +1441,10 @@ bool Result::gotoNext(SqlCachedResult::ValueCache& row, int rowIdx)
 
             case PG_TYPE_TIMESTAMP:
                 row[idx] = fromTimeStamp(bswap_64(*(qint64*)value));
+                break;
+
+            case PG_TYPE_TIMESTAMPTZ:
+                row[idx] = fromTimeStampUtc(bswap_64(*(qint64*)value));
                 break;
 
             case PG_TYPE_BYTEARRAY:
