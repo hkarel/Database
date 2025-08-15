@@ -1167,8 +1167,25 @@ bool Result::exec()
         const QVector<QVariant>& values = boundValues();
         if (alog::logger().level() == alog::Level::Debug2)
         {
-            for (i = 0; i < values.count(); ++i)
-                log_debug2_m << "Query param" << i << ": " << values[i];
+            int count = qMin(values.count(), int(_inda->sqld));
+            for (i = 0; i < count; ++i)
+            {
+                alog::Line logLine = log_debug2_m << "Query param" << i << ": ";
+                const XSQLVAR& sqlVar = _inda->sqlvar[i];
+                switch (sqlVar.sqltype & ~1)
+                {
+                    case SQL_TYPE_TIME:
+                        logLine << values[i].toTime();
+                        break;
+
+                    case SQL_TYPE_DATE:
+                        logLine << values[i].toDate();
+                        break;
+
+                    default:
+                        logLine << values[i];
+                }
+            }
         }
         if (values.count() != _inda->sqld)
         {
@@ -1300,11 +1317,11 @@ bool Result::exec()
                     break;
 
                 case SQL_TYPE_TIME:
-                   *((ISC_TIME*)sqlVar.sqldata) = toTime(val.toTime());
+                    *((ISC_TIME*)sqlVar.sqldata) = toTime(val.toTime());
                     break;
 
                 case SQL_TYPE_DATE:
-                   *((ISC_DATE*)sqlVar.sqldata) = toDate(val.toDate());
+                    *((ISC_DATE*)sqlVar.sqldata) = toDate(val.toDate());
                     break;
 
                 case SQL_VARYING:
